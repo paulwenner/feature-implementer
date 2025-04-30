@@ -1031,40 +1031,58 @@ textarea {
 
 /* Preset-Selector Component */
 .preset-selector {
-  margin: 1rem 0;
+  margin-bottom: 1.5rem;
 }
 
 .preset-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .preset-option {
   display: flex;
   align-items: center;
-  padding: 0.5rem 1rem;
-  border: 2px solid var(--border);
-  border-radius: 0.5rem;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+  position: relative;
 }
 
-.preset-option input[type="radio"] {
-  margin-right: 0.5rem;
-  accent-color: var(--accent);
+.preset-option input[type="checkbox"] {
+  margin-right: 8px;
 }
 
 .preset-option:hover {
   background-color: var(--folder-hover);
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
-/* Checked state — uses :has() */
-.preset-option:has(input[type="radio"]:checked) {
+/* Highlight selected preset options */
+.preset-option:has(input[type="checkbox"]:checked) {
+  background-color: rgba(3, 102, 214, 0.1);
   border-color: var(--accent);
+}
+
+#clear-presets-button {
+  margin-right: 8px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.preset-selected-count {
+  display: inline-block;
+  background-color: var(--accent);
+  color: white;
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  margin-left: 8px;
+  min-width: 20px;
+  text-align: center;
 }
 
 /* Add preset styles */
@@ -1157,13 +1175,7 @@ textarea {
     color: var(--text-primary);
 }
 
-/* Preset selector styles */
-.preset-option {
-    display: flex;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
+/* Delete button for presets */
 .delete-preset-btn {
     margin-left: 8px;
     font-size: 12px;

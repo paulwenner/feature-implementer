@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Initialize preset selector with checkboxes and counter
+    initPresetSelector();
+    
     /**
      * Shows the add preset modal with currently selected files
      */
@@ -44,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get all selected files
         const selectedFiles = getSelectedFiles();
         if (selectedFiles.length === 0) {
-            showToast('No files selected', 'error');
+            console.warn('No files selected when trying to create preset');
             return;
         }
         
@@ -180,7 +183,6 @@ function savePreset() {
             // Success - refresh presets
             updatePresets(data.presets);
             closeAddPresetModal();
-            showToast(`Preset "${presetName}" saved successfully`, 'success');
         }
     })
     .catch(error => {
@@ -188,6 +190,77 @@ function savePreset() {
         errorEl.textContent = `Error saving preset: ${error.message}`;
         errorEl.style.display = 'block';
     });
+}
+
+/**
+ * Updates the preset selection counter display
+ */
+function updatePresetSelectionCounter() {
+    const selectedPresets = document.querySelectorAll('input[name="presets"]:checked');
+    const presetTitle = document.querySelector('.preset-selector .section-title');
+    
+    if (!presetTitle) return;
+    
+    // Remove existing counter if present
+    const existingCounter = presetTitle.querySelector('.preset-selected-count');
+    if (existingCounter) {
+        existingCounter.remove();
+    }
+    
+    // Add counter if presets are selected
+    if (selectedPresets.length > 0) {
+        const counter = document.createElement('span');
+        counter.className = 'preset-selected-count';
+        counter.textContent = selectedPresets.length;
+        presetTitle.appendChild(counter);
+    }
+}
+
+/**
+ * Handles multiple preset selections from checkboxes
+ * @param {string} presetName - The name of the selected/deselected preset
+ * @param {boolean} isChecked - Whether the preset was checked or unchecked
+ */
+function handleMultiplePresetSelection(presetName, isChecked) {
+    const preset = window.presets[presetName];
+    if (!preset || !preset.files || !Array.isArray(preset.files)) {
+        console.warn('Invalid preset:', presetName);
+        return;
+    }
+    
+    if (isChecked) {
+        // Add all files from this preset
+        preset.files.forEach(filePath => {
+            const checkbox = document.querySelector(`input[value="${filePath}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        });
+        
+        // Update the UI
+        updateSelectedFilesList();
+        updatePresetSelectionCounter();
+    } else {
+        // We don't remove files when unchecking a preset
+        // Just update the counter
+        updatePresetSelectionCounter();
+    }
+}
+
+/**
+ * Clear all selected files and uncheck all preset checkboxes
+ */
+function clearAllPresets() {
+    // Uncheck all preset checkboxes
+    document.querySelectorAll('input[name="presets"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Clear all selected files
+    clearSelectedFiles();
+    
+    // Update counter
+    updatePresetSelectionCounter();
 }
 
 /**
@@ -203,7 +276,7 @@ function handlePresetSelection(presetName) {
     
     const preset = window.presets[presetName];
     if (!preset || !preset.files || !Array.isArray(preset.files)) {
-        showToast('Invalid preset', 'error');
+        console.warn('Invalid preset:', presetName);
         return;
     }
     
@@ -220,7 +293,6 @@ function handlePresetSelection(presetName) {
     
     // Update the UI
     updateSelectedFilesList();
-    showToast(`Loaded preset "${presetName}"`, 'success');
 }
 
 /**
@@ -283,19 +355,19 @@ function updatePresets(presets) {
     const presetContainer = document.querySelector('.preset-options');
     if (!presetContainer) return;
     
-    // Keep the 'None' option
+    // Add the 'Clear All' button
     let html = `
         <label class="preset-option">
-            <input type="radio" name="preset" value="" checked> None
+            <input type="button" id="clear-presets-button" class="button button-small button-secondary" value="Clear All">
         </label>
     `;
     
-    // Add all presets
+    // Add all presets as checkboxes
     for (const [name, _] of Object.entries(presets)) {
         html += `
             <label class="preset-option">
-                <input type="radio" name="preset" value="${name}"> ${name}
-                <button type="button" class="action-button delete-preset-btn" data-preset="${name}" title="Delete preset">
+                <input type="checkbox" name="presets" value="${name}"> ${name}
+                <button type="button" class="action-button" data-preset="${name}" title="Delete preset" onclick="deletePreset('${name}')">
                     <i class="fas fa-trash-alt"></i>
                 </button>
             </label>
@@ -304,15 +376,12 @@ function updatePresets(presets) {
     
     presetContainer.innerHTML = html;
     
-    // Add click handlers for delete buttons
-    document.querySelectorAll('.delete-preset-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const presetName = this.getAttribute('data-preset');
-            deletePreset(presetName);
-        });
-    });
+    
+    // Add click handler for clear all button
+    const clearButton = document.getElementById('clear-presets-button');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearAllPresets);
+    }
     
     // Reinitialize the preset selector
     initPresetSelector();
@@ -359,5 +428,29 @@ function testJsonEndpoint() {
     });
 }
 
-// Make it available globally
+/**
+ * Initializes the preset selector checkboxes with event listeners
+ */
+function initPresetSelector() {
+    const presetCheckboxes = document.querySelectorAll('input[name="presets"]');
+    presetCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            handleMultiplePresetSelection(this.value, this.checked);
+        });
+    });
+    
+    // Initialize clear button
+    const clearButton = document.getElementById('clear-presets-button');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearAllPresets);
+    }
+    
+    // Initialize counter
+    updatePresetSelectionCounter();
+}
+
+// Make functions globally available
+window.handleMultiplePresetSelection = handleMultiplePresetSelection;
+window.clearAllPresets = clearAllPresets;
+window.initPresetSelector = initPresetSelector;
 window.testJsonEndpoint = testJsonEndpoint; 

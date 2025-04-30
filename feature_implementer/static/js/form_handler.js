@@ -21,8 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return Math.ceil(text.length / 4);
     }
     
-    // Set up preset selector
-    initPresetSelector();
+    // Preset selector is initialized in preset_handler.js
     
     // Bind the form submit event
     if (generateForm) {
@@ -153,18 +152,6 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('Prompt exported as Markdown file', 'success');
     }
 });
-
-/**
- * Initializes the preset selector radio buttons with event listeners
- */
-function initPresetSelector() {
-    const presetRadios = document.querySelectorAll('input[name="preset"]');
-    presetRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            handlePresetSelection(this.value);
-        });
-    });
-}
 
 /**
  * Closes the prompt modal dialog

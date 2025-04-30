@@ -77,15 +77,20 @@
                 </div>
                 
                 <div class="preset-selector section">
-                    <h3 class="section-title">Service Presets</h3>
+                    <h3 class="section-title">Presets</h3>
                     <div class="preset-options">
                         <label class="preset-option">
-                            <input type="radio" name="preset" value="" checked> None
+                            <input type="button" id="clear-presets-button" class="button button-small button-secondary" value="Clear All">
                         </label>
                         {% for preset_name in presets.keys() %}
-                        <label class="preset-option">
-                            <input type="radio" name="preset" value="{{ preset_name }}"> {{ preset_name.capitalize() }}
-                        </label>
+                        <div class="preset-option">
+                            <label>
+                                <input type="checkbox" name="presets" value="{{ preset_name }}"> {{ preset_name.capitalize() }}
+                            </label>
+                            <button type="button" class="action-button" data-preset="{{ preset_name }}" title="Delete preset">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>

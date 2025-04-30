@@ -343,12 +343,6 @@ def create_app():
         try:
             logger.info(f"Attempting to delete preset: {preset_name}")
 
-            # Check if preset exists before attempting to delete
-            presets = Config.get_presets()
-            if preset_name not in presets:
-                logger.warning(f"Preset not found in current presets: {preset_name}")
-                return jsonify({"error": f"Preset '{preset_name}' not found"}), 404
-
             # Attempt to delete the preset
             success = Config.delete_preset(preset_name)
 
@@ -362,17 +356,8 @@ def create_app():
 
                 return jsonify({"success": True, "presets": Config.REFINED_PRESETS})
             else:
-                logger.warning(
-                    f"Failed to delete preset (DB operation failed): {preset_name}"
-                )
-                return (
-                    jsonify(
-                        {
-                            "error": f"Failed to delete preset '{preset_name}' from database"
-                        }
-                    ),
-                    500,
-                )
+                logger.warning(f"Preset '{preset_name}' not found or deletion failed")
+                return jsonify({"error": f"Preset '{preset_name}' not found"}), 404
         except Exception as e:
             logger.error(f"Error deleting preset: {e}", exc_info=True)
             return jsonify({"error": f"Error deleting preset: {e}"}), 500
