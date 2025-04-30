@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import render_file_tree %}
+
+{% block additional_head %}
+<script>
+    const presets = JSON.parse('{{ presets_json | safe }}');
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- Form encompassing both sidebar structure and content fields -->
+<form action="{{ url_for('handle_generate') }}" method="post" id="generate-form" class="main-content">
+    
+    <!-- Sidebar with file explorer -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>EXPLORER</span>
+        </div>
+        <div class="file-explorer">
+            <div class="file-tree">
+                {% for dir_name, dir_content in file_tree.items() %}
+                    {% if dir_content is mapping %}
+                        <div class="directory-section">
+                            {{ render_file_tree({dir_name: dir_content}, 0) }}
+                        </div>
+                    {% else %}
+                        <p class="error">{{ dir_content.error }}</p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Content area with other form fields -->
+    <div class="content">
+        <!-- File preview area -->
+        <div class="file-preview" id="file-preview">
+            <div class="file-preview-header">
+                <span id="preview-filename"></span>
+                <button type="button" class="close-preview-button" onclick="closeFilePreview()" title="Close preview" style="display: none;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <pre class="file-preview-content" id="preview-content"></pre>
+        </div>
+        
+        <!-- Form container for text fields -->
+        <div class="form-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="form-section">
+                <div class="preset-selector section">
+                    <h3 class="section-title">Service Presets</h3>
+                    <div class="preset-options">
+                        <label class="preset-option">
+                            <input type="radio" name="preset" value="" checked> None
+                        </label>
+                        {% for preset_name in presets.keys() %}
+                        <label class="preset-option">
+                            <input type="radio" name="preset" value="{{ preset_name }}"> {{ preset_name.capitalize() }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <h2 class="section-title">Selected Files</h2>
+                <div id="selected-files-list">
+                    <p class="text-secondary">No files selected yet. Click the + button next to files to add them.</p>
+                </div>
+                <!-- Hidden input to ensure form submission even if no files selected -->
+                <input type="hidden" name="form_submitted" value="1">
+            </div>
+            
+            <div class="form-section">
+                <h2 class="section-title">JIRA Ticket Description</h2>
+                <textarea name="jira_description" placeholder="Paste your JIRA ticket description here..."></textarea>
+            </div>
+            
+            <div class="form-section">
+                <h2 class="section-title">Additional Instructions</h2>
+                <textarea name="additional_instructions" placeholder="Any additional implementation instructions..."></textarea>
+            </div>
+        </div>
+        
+        <!-- Form actions (submit/reset buttons) -->
+        <div class="form-actions">
+            <button type="reset" class="button button-secondary" onclick="clearSelectedFiles()">Reset</button>
+            <button type="submit" class="button">Generate Prompt</button>
+        </div>
+    </div>
+    
+</form>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal Structure -->
+<div id="modal-overlay" style="display: none;"></div>
+<div id="prompt-modal" style="display: none;">
+    <div class="prompt-header">
+        <h2>Generated Prompt</h2>
+        <div class="prompt-meta">
+            <span id="char-count-info"></span>
+            <span id="token-estimate-info"></span>
+        </div>
+        <div class="prompt-actions">
+            <button id="copy-button" class="button button-small button-secondary" title="Copy to Clipboard"><i class="fas fa-copy"></i> Copy</button>
+            <button id="export-button" class="button button-small button-secondary" title="Export as Markdown"><i class="fas fa-file-download"></i> Export (.md)</button>
+        </div>
+        <button type="button" class="close-modal-button" onclick="closePromptModal()" title="Close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <pre id="prompt-modal-content" style="max-height: 80vh; overflow-y: auto; white-space: pre-wrap;"></pre>
+    <div id="loading-indicator" style="display: none;">
+        <p>Generating prompt...</p>
+    </div>
+    <div id="prompt-error-area" class="alert alert-error" style="display: none;"></div>
+</div>
+{% endblock %}
+
+{% block additional_scripts %}
+<script src="{{ url_for('static', filename='js/file_explorer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
+{% endblock %} 

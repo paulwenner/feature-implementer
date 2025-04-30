@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Feature Implementation Prompt Generator{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block additional_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <h1 class="title">Feature Implementation Prompt Generator</h1>
+            <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">
+                <i class="fas fa-moon"></i>
+            </button>
+        </header>
+        
+        {% block content %}{% endblock %}
+    </div>
+    
+    <div id="toast-container"></div>
+    
+    {% block modals %}{% endblock %}
+    
+    <script src="{{ url_for('static', filename='js/ui_utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script>
+    {% block additional_scripts %}{% endblock %}
+</body>
+</html> 

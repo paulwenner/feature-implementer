@@ -1,0 +1,53 @@
+{% macro render_file_tree(tree, level) %}
+    {% set non_previewable_extensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt', 'pdf', 'zip', 'gz', 'tar', 'rar'] %}
+    <ul class="file-list">
+        {% for key, value in tree.items() %}
+            {% if value is mapping %}
+                <li class="folder">
+                    <div class="folder-label" onclick="toggleFolder(this)">
+                        <span class="folder-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </span>
+                        <span class="icon folder-icon">
+                            <i class="fas fa-folder"></i>
+                        </span>
+                        <span class="folder-name">{{ key }}</span>
+                    </div>
+                    <ul class="folder-content" style="display: none;">
+                        {{ render_file_tree(value, level + 1) }}
+                    </ul>
+                </li>
+            {% else %}
+                {# --- Logic to check if file is previewable --- #}
+                {% set filename_lower = key|lower %}
+                {% set file_ext = filename_lower.split('.')[-1] if '.' in filename_lower else '' %}
+                {% set is_previewable = file_ext not in non_previewable_extensions %}
+                {# --- End logic --- #}
+                <li class="file">
+                    <div class="file-label">
+                        <label class="checkbox-container">
+                            <input type="checkbox" name="context_files" value="{{ value }}" data-filename="{{ key }}" id="file_{{ value|replace('/', '_')|replace('.', '_') }}" onchange="updateSelectedFilesList()">
+                            <span class="custom-checkbox"></span>
+                        </label>
+                        <div class="file-info" {% if is_previewable %}onclick="toggleFilePreview('{{ value }}', '{{ key }}')"{% endif %} >
+                            <span class="icon file-icon">
+                                <i class="fas fa-file"></i>
+                            </span>
+                            <span class="filename">{{ key }}</span>
+                        </div>
+                        <div class="file-actions">
+                            <button type="button" 
+                                    class="action-button {% if not is_previewable %}not-previewable{% endif %}" 
+                                    {% if is_previewable %}onclick="toggleFilePreview('{{ value }}', '{{ key }}')"{% else %}disabled title="Preview not available for this file type"{% endif %}>
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button type="button" class="action-button" onclick="addFileToContext('{{ value }}', '{{ key }}')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+{% endmacro %}
