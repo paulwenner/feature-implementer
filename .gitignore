@@ -1,0 +1,75 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg
+*.egg-info/
+lib/
+lib64/
+parts/
+sdist/
+var/
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+env/
+venv/
+ENV/
+.env/
+.venv/
+
+# Flask instance folder
+instance/
+
+# Database files
+*.sqlite3
+*.db
+
+# Migrations (if using Alembic)
+# Comment out if you do want to track migration scripts
+# migrations/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# MacOS
+.DS_Store
+
+# Logs
+*.log
+
+# Coverage reports
+coverage.xml
+*.cover
+*.coverage.*
+
+# DS Store
+.DS_Store
+
+# Cursor Rules
+.cursorrules
+

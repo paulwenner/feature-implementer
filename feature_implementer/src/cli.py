@@ -7,9 +7,10 @@ from config import Config
 from src.prompt_generator import generate_prompt
 from src.file_utils import save_prompt_to_file
 
+
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments.
-    
+
     Returns:
         Parsed arguments namespace
     """
@@ -56,15 +57,15 @@ def parse_arguments() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+
 def main_cli() -> None:
     """Main CLI entry point for generating prompts."""
     # Configure logging
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
     logger = logging.getLogger(__name__)
-    
+
     args = parse_arguments()
 
     all_context_files: List[Path] = args.context_files + args.always_include
@@ -87,5 +88,6 @@ def main_cli() -> None:
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
 
+
 if __name__ == "__main__":
-    main_cli() 
+    main_cli()
