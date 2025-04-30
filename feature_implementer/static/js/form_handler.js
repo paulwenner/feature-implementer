@@ -11,6 +11,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const charCountInfo = document.getElementById('char-count-info');
     const tokenEstimateInfo = document.getElementById('token-estimate-info');
     
+    /**
+     * Rough client-side GPT token estimator
+     * @param {string} text - the full prompt text
+     * @returns {number} estimated token count
+     */
+    function estimateTokens(text) {
+        // On average 1 token ≈ 4 characters
+        return Math.ceil(text.length / 4);
+    }
+    
     // Set up preset selector
     initPresetSelector();
     
@@ -67,12 +77,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 promptContent.style.display = 'block';
                 
                 // Update metadata info
-                if (data.char_count) {
-                    charCountInfo.textContent = `${data.char_count.toLocaleString()} characters`;
+                const promptText = data.prompt || '';
+                // Character count
+                const charCountValue = data.char_count != null ? data.char_count : promptText.length;
+                charCountInfo.textContent = `${charCountValue.toLocaleString()} characters`;
+                // Token estimate with fallback to client-side estimator
+                let tokenCount;
+                if (data.token_estimate && data.token_estimate > 0) {
+                    tokenCount = data.token_estimate;
+                } else {
+                    tokenCount = estimateTokens(promptText);
                 }
-                if (data.token_estimate) {
-                    tokenEstimateInfo.textContent = `~${data.token_estimate.toLocaleString()} tokens`;
-                }
+                tokenEstimateInfo.textContent = `~${tokenCount.toLocaleString()} tokens`;
             }
         })
         .catch(error => {

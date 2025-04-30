@@ -16,25 +16,12 @@ function initFileExplorer() {
 
     if (!fileTreeContainer) return;
 
-    // Use event delegation for folder expand/collapse
+    // Use event delegation for all interactions besides folder toggle (which uses inline onclick)
     fileTreeContainer.addEventListener('click', function(event) {
-        const folderLabel = event.target.closest('.folder-label');
-        if (folderLabel) {
-            const content = folderLabel.nextElementSibling;
-            const folderArrow = folderLabel.querySelector('.folder-arrow i');
-            
-            if (content && folderArrow) {
-                if (!content.style.display || content.style.display === 'none') {
-                    content.style.display = 'block';
-                    folderArrow.classList.remove('fa-chevron-right');
-                    folderArrow.classList.add('fa-chevron-down'); // Indicate open state
-                } else {
-                    content.style.display = 'none';
-                    folderArrow.classList.remove('fa-chevron-down');
-                    folderArrow.classList.add('fa-chevron-right'); // Indicate closed state
-                }
-            }
-            return; // Prevent other handlers if it was a folder label click
+        // If clicked on a folder-label, don't interfere - let the inline toggleFolder handle it
+        if (event.target.closest('.folder-label')) {
+            // Don't process any more handlers
+            return;
         }
         
         // Use event delegation for file preview toggle (on file-info div)
@@ -175,12 +162,170 @@ function addFileToContext(filepath, filename) {
     }
 }
 
+// Function to toggle folder expand/collapse state
+function toggleFolder(folderLabel) {
+    console.log('toggleFolder called directly for:', folderLabel);
+    
+    // Make sure we have a valid folder label element
+    if (!folderLabel || !folderLabel.classList.contains('folder-label')) {
+        console.error('Invalid folder label element:', folderLabel);
+        return;
+    }
+    
+    const content = folderLabel.nextElementSibling;
+    const folderArrow = folderLabel.querySelector('.folder-arrow i');
+    
+    if (content && folderArrow) {
+        if (!content.style.display || content.style.display === 'none') {
+            // Opening folder
+            content.style.display = 'block';
+            folderArrow.classList.remove('fa-chevron-right');
+            folderArrow.classList.add('fa-chevron-down'); // Indicate open state
+            console.log('Folder opened');
+        } else {
+            // Closing folder
+            content.style.display = 'none';
+            folderArrow.classList.remove('fa-chevron-down');
+            folderArrow.classList.add('fa-chevron-right'); // Indicate closed state
+            console.log('Folder closed');
+        }
+    } else {
+        console.error('Missing content or arrow elements for folder:', folderLabel);
+    }
+}
+
+// Function to collect paths of all expanded folders
+function getExpandedFolderPaths() {
+    const expandedFolders = document.querySelectorAll('.folder-content[style="display: block;"]');
+    const expandedPaths = [];
+    
+    console.log(`Found ${expandedFolders.length} expanded folders to save`);
+    
+    expandedFolders.forEach(folder => {
+        // Construct path from folder hierarchy
+        let currentElement = folder;
+        let path = [];
+        
+        // Traverse up to find all parent folder names
+        while (currentElement) {
+            const folderLabel = currentElement.previousElementSibling;
+            if (folderLabel && folderLabel.classList.contains('folder-label')) {
+                const folderName = folderLabel.querySelector('.folder-name');
+                if (folderName) {
+                    path.unshift(folderName.textContent.trim());
+                }
+            }
+            
+            // Move up to parent folder's content
+            const parentFolder = currentElement.closest('.folder');
+            if (!parentFolder) break;
+            
+            currentElement = parentFolder.parentElement;
+            // If we're still within the file-tree, continue
+            if (!currentElement || !currentElement.closest('.file-tree')) break;
+        }
+        
+        if (path.length > 0) {
+            const folderPath = path.join('/');
+            expandedPaths.push(folderPath);
+            console.log(`Saved expanded folder path: ${folderPath}`);
+        }
+    });
+    
+    return expandedPaths;
+}
+
+// Function to expand folders based on saved paths
+function restoreExpandedFolders(expandedPaths) {
+    if (!expandedPaths || expandedPaths.length === 0) {
+        console.log('No expanded paths to restore');
+        return;
+    }
+    
+    console.log(`Attempting to restore ${expandedPaths.length} expanded folders`);
+    
+    const fileTree = document.querySelector('.file-tree');
+    if (!fileTree) {
+        console.warn('File tree not found for restoration');
+        return;
+    }
+    
+    // First pass: expand all top-level folders that match
+    expandedPaths.forEach(path => {
+        const topFolder = path.split('/')[0];
+        const topFolderElements = fileTree.querySelectorAll('.folder-label');
+        
+        topFolderElements.forEach(label => {
+            const folderName = label.querySelector('.folder-name');
+            if (folderName && folderName.textContent.trim() === topFolder) {
+                const content = label.nextElementSibling;
+                const folderArrow = label.querySelector('.folder-arrow i');
+                
+                if (content && folderArrow) {
+                    content.style.display = 'block';
+                    folderArrow.classList.remove('fa-chevron-right');
+                    folderArrow.classList.add('fa-chevron-down');
+                    console.log(`Expanded top-level folder: ${topFolder}`);
+                }
+            }
+        });
+    });
+    
+    // Second pass: expand specific paths in full
+    expandedPaths.forEach(path => {
+        const pathParts = path.split('/');
+        let currentLevel = fileTree;
+        let currentPath = '';
+        
+        // Navigate through each path segment
+        for (let i = 0; i < pathParts.length; i++) {
+            currentPath += (i > 0 ? '/' : '') + pathParts[i];
+            
+            // Find folder at this level
+            const folderLabels = currentLevel.querySelectorAll('.folder-label');
+            let found = false;
+            
+            for (const label of folderLabels) {
+                const folderName = label.querySelector('.folder-name');
+                if (folderName && folderName.textContent.trim() === pathParts[i]) {
+                    // Found the folder, expand it
+                    const content = label.nextElementSibling;
+                    const folderArrow = label.querySelector('.folder-arrow i');
+                    
+                    if (content && folderArrow) {
+                        content.style.display = 'block';
+                        folderArrow.classList.remove('fa-chevron-right');
+                        folderArrow.classList.add('fa-chevron-down');
+                        console.log(`Expanded folder in path: ${currentPath}`);
+                    }
+                    
+                    // Continue with the next level
+                    currentLevel = content;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                console.log(`Could not find folder in path: ${currentPath}`);
+                break; // Path no longer exists, stop trying
+            }
+        }
+    });
+}
+
 // Refreshes the file tree by fetching new data from the server
 async function refreshFileTree() {
     const fileTreeContainer = document.querySelector('.file-tree');
     const refreshButtonIcon = document.querySelector('#refresh-file-tree-button i');
     
     if (!fileTreeContainer || !refreshButtonIcon) return;
+
+    // Save expanded folder state before refresh
+    const expandedPaths = getExpandedFolderPaths();
+    
+    // Save selected files state
+    const selectedFiles = getSelectedFiles();
 
     // Indicate loading state
     refreshButtonIcon.classList.add('fa-spin');
@@ -195,6 +340,10 @@ async function refreshFileTree() {
         
         if (data.html) {
             fileTreeContainer.innerHTML = data.html;
+            // Restore expanded folders
+            restoreExpandedFolders(expandedPaths);
+            // Restore selected files
+            restoreSelectedFiles(selectedFiles);
             // No need to re-call initFileExplorer due to event delegation
         } else if (data.error) {
             showToast(`Error refreshing file tree: ${data.error}`, 'error');
@@ -212,6 +361,45 @@ async function refreshFileTree() {
         refreshButtonIcon.classList.remove('fa-spin');
         fileTreeContainer.style.opacity = '1';
     }
+}
+
+// Function to get all currently selected files
+function getSelectedFiles() {
+    const selectedCheckboxes = document.querySelectorAll('input[name="context_files"]:checked');
+    const selected = [];
+    
+    selectedCheckboxes.forEach(checkbox => {
+        selected.push({
+            path: checkbox.value,
+            filename: checkbox.getAttribute('data-filename')
+        });
+    });
+    
+    console.log(`Saved ${selected.length} selected files before refresh`);
+    return selected;
+}
+
+// Function to restore previously selected files
+function restoreSelectedFiles(selectedFiles) {
+    if (!selectedFiles || selectedFiles.length === 0) {
+        console.log('No selected files to restore');
+        return;
+    }
+    
+    console.log(`Attempting to restore ${selectedFiles.length} selected files`);
+    
+    selectedFiles.forEach(file => {
+        const checkbox = document.querySelector(`input[value="${file.path}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+            console.log(`Restored selection for file: ${file.filename}`);
+        } else {
+            console.log(`Could not find checkbox for file: ${file.filename} (${file.path})`);
+        }
+    });
+    
+    // Update the selected files list in the UI
+    updateSelectedFilesList();
 }
 
 // Utility function for showing toast messages (assuming you have a toast mechanism)

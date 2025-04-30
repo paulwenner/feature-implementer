@@ -108,6 +108,12 @@ def create_app():
                     jsonify({"error": "Please select at least one context file."}),
                     400,
                 )
+            if not jira_desc:
+                logger.warning("No Jira description provided, returning error.")
+                return (
+                    jsonify({"error": "Please provide a Jira description."}),
+                    400,
+                )
 
             logger.info(f"Files selected ({len(selected_files)}), generating prompt...")
 
