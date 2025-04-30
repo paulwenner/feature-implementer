@@ -927,7 +927,6 @@ textarea {
 /* Make confirmation modal content responsive */
 .confirm-modal-content {
     width: auto; /* Remove fixed width */
-    max-width: 450px; /* Set a max-width */
     /* It should inherit padding, bg etc from .modal structure */
 }
 
@@ -1217,6 +1216,7 @@ textarea {
 .header-actions {
     display: flex;
     gap: 10px;
+    align-items: center;
 }
 
 .templates-table-wrapper {
@@ -1498,4 +1498,119 @@ textarea {
 
 .checkbox-group input[type="checkbox"] {
     margin-right: 8px;
+}
+
+/* Header Actions */
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.tutorial-button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9rem;
+}
+
+.tutorial-button:hover {
+    background-color: var(--folder-hover);
+    color: var(--accent);
+}
+
+.tutorial-button i {
+    font-size: 1.1rem;
+}
+
+/* Tutorial Tour Styles */
+.tour-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3); /* Less dark overlay, changed from 0.6 to 0.3 */
+    z-index: 9000;
+    pointer-events: none;
+}
+
+.tour-spotlight {
+    position: absolute;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4); /* Lighter shadow around the spotlight */
+    border-radius: 4px;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 9001;
+    background-color: transparent; /* Ensure the spotlight area is transparent */
+}
+
+.tour-tooltip {
+    position: absolute;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    width: 300px;
+    z-index: 9002;
+    pointer-events: auto;
+}
+
+.tour-tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.tour-step-number {
+    color: var(--accent);
+}
+
+.tour-tooltip-content {
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.tour-tooltip-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+}
+
+.tour-btn {
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border: none;
+}
+
+.tour-btn-primary {
+    background-color: var(--accent);
+    color: white;
+}
+
+.tour-btn-primary:hover {
+    background-color: var(--accent-hover);
+}
+
+.tour-btn-secondary {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.tour-btn-secondary:hover {
+    background-color: var(--folder-hover);
 }
