@@ -16,12 +16,15 @@ A tool to generate feature implementation prompts for software development proje
 ```
 feature_implementer/
 ├── README.md               # Project documentation
+├── LICENSE                 # Project License (MIT)
 ├── requirements.txt        # Python dependencies
 ├── config.py              # Configuration settings
 ├── run.py                 # Application entry point
+├── feature_implementation_template.md # Default template for feature implementation prompts
 ├── src/                   # Source code
 │   ├── __init__.py
 │   ├── app.py             # Flask application setup
+│   ├── cli.py             # Command Line Interface entry point
 │   ├── file_utils.py      # File management utilities
 │   ├── prompt_generator.py # Prompt generation logic
 ├── static/                # Static assets
@@ -30,15 +33,21 @@ feature_implementer/
 │   ├── js/                # JavaScript files
 │   │   ├── file_explorer.js # File explorer functionality
 │   │   ├── form_handler.js  # Form submission handling
+│   │   ├── modal_utils.js   # Modal dialog utilities
+│   │   ├── preset_handler.js # Preset management functionality
 │   │   ├── theme_toggle.js  # Theme switching
 │   │   └── ui_utils.js      # UI utility functions
+│   └── assets/            # Static assets like icons
 ├── templates/             # HTML templates
 │   ├── base.html          # Base template with common elements
-│   ├── index.html         # Main page
+│   ├── index.html         # Main page for prompt generation
 │   ├── macros.html        # Reusable template components
+│   ├── result.html        # Page to display generated prompt
 │   ├── template_manager.html # Template management page
-├── outputs/               # Generated output directory
-└── Dockerfile             # Docker configuration
+│   └── user_templates/    # Directory for user-created templates (if stored as files)
+├── outputs/               # Default directory for generated output files
+├── Dockerfile             # Docker configuration
+└── docker-compose.yml     # Docker Compose configuration (if used from parent directory)
 ```
 
 ## Setup
@@ -78,12 +87,13 @@ feature_implementer/
 
 ## Usage
 
-1. Navigate to the web interface
-2. Select files from your codebase to provide context
-3. Enter Jira ticket description (if applicable)
-4. Add any additional implementation instructions
-5. Click "Generate Prompt"
-6. Copy or export the generated prompt for use with an LLM 
+1. **Place your project code** into the `data/` directory within the `feature_implementer` folder. The file explorer in the web UI will display the contents of this directory. (The current content is just placeholder data).
+2. Navigate to the web interface (usually http://localhost:5000).
+3. Select files from your codebase (shown in the file explorer) to provide context for the prompt.
+4. Enter Jira ticket description (if applicable).
+5. Add any additional implementation instructions.
+6. Click "Generate Prompt".
+7. Copy or export the generated prompt for use with an LLM.
 
 ## Template Management
 
@@ -119,4 +129,8 @@ python -m src.cli --set-default TEMPLATE_ID
 
 # Use a specific template
 python -m src.cli --template-id TEMPLATE_ID --context-files path/to/file.py
-``` 
+```
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details. 
