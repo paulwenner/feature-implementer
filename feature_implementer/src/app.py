@@ -14,6 +14,7 @@ import logging
 import os.path
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
+import sqlite3
 
 from config import Config
 from src.file_utils import get_file_tree, read_file_content
@@ -38,6 +39,16 @@ def create_app():
 
     logger = logging.getLogger(__name__)
 
+    # Initialize database structure first
+    try:
+        logger.info("Initializing database structure...")
+        Config._init_preset_db()
+        logger.info("Database structure initialized.")
+    except Exception as e:
+        logger.error(
+            f"ERROR: Failed to initialize database structure: {e}", exc_info=True
+        )
+
     # Load presets at startup
     try:
         Config.REFINED_PRESETS = Config.get_presets()
@@ -53,6 +64,16 @@ def create_app():
         logger.info("Initial file tree scan complete and cached.")
     except Exception as e:
         logger.error(f"ERROR: Initial file tree scan failed: {e}", exc_info=True)
+
+    # Initialize standard templates (after database is created)
+    try:
+        logger.info("Initializing standard templates...")
+        Config.create_standard_templates()
+        logger.info("Standard templates initialized.")
+    except Exception as e:
+        logger.error(
+            f"ERROR: Failed to initialize standard templates: {e}", exc_info=True
+        )
 
     @app.route("/", methods=["GET"])
     def index() -> str:
@@ -80,6 +101,18 @@ def create_app():
             presets = Config.REFINED_PRESETS
             presets_json = json.dumps(presets)
 
+            # Get available templates
+            templates = Config.get_templates()
+            default_template_id = Config.get_default_template_id()
+            templates_json = json.dumps(templates)
+
+            # Initialize default template if none exists
+            if not templates:
+                Config.initialize_default_template()
+                templates = Config.get_templates()
+                default_template_id = Config.get_default_template_id()
+                templates_json = json.dumps(templates)
+
             return render_template(
                 "index.html",
                 file_tree=file_tree,
@@ -87,6 +120,9 @@ def create_app():
                 template_preview=template_preview,
                 presets=presets,
                 presets_json=presets_json,
+                templates=templates,
+                templates_json=templates_json,
+                default_template_id=default_template_id,
             )
         except Exception as e:
             flash(f"Error rendering page: {e}", "error")
@@ -97,6 +133,9 @@ def create_app():
                 template_preview="Error loading page.",
                 presets={},
                 presets_json="{}",
+                templates=[],
+                templates_json="[]",
+                default_template_id=None,
             )
 
     @app.route("/generate", methods=["POST"])
@@ -111,6 +150,12 @@ def create_app():
             selected_files = request.form.getlist("context_files")
             jira_desc = request.form.get("jira_description", "")
             instructions = request.form.get("additional_instructions", "")
+            template_id = request.form.get("template_id")
+
+            if template_id and template_id.isdigit():
+                template_id = int(template_id)
+            else:
+                template_id = Config.get_default_template_id()
 
             if not selected_files:
                 logger.warning("No files selected, returning error.")
@@ -127,12 +172,23 @@ def create_app():
 
             logger.info(f"Files selected ({len(selected_files)}), generating prompt...")
 
-            final_prompt = generate_prompt(
-                template_path=Config.DEFAULT_TEMPLATE,
-                context_files=selected_files,
-                jira_description=jira_desc,
-                additional_instructions=instructions,
-            )
+            # Use the specified template or default
+            if template_id:
+                logger.info(f"Using template ID: {template_id}")
+                final_prompt = generate_prompt(
+                    template_id=template_id,
+                    context_files=selected_files,
+                    jira_description=jira_desc,
+                    additional_instructions=instructions,
+                )
+            else:
+                logger.info(f"Using default template file: {Config.DEFAULT_TEMPLATE}")
+                final_prompt = generate_prompt(
+                    template_path=Config.DEFAULT_TEMPLATE,
+                    context_files=selected_files,
+                    jira_description=jira_desc,
+                    additional_instructions=instructions,
+                )
 
             char_count = len(final_prompt)
             # Better token estimation - approx 4 chars per token for English text
@@ -286,15 +342,37 @@ def create_app():
         """
         try:
             logger.info(f"Attempting to delete preset: {preset_name}")
+
+            # Check if preset exists before attempting to delete
+            presets = Config.get_presets()
+            if preset_name not in presets:
+                logger.warning(f"Preset not found in current presets: {preset_name}")
+                return jsonify({"error": f"Preset '{preset_name}' not found"}), 404
+
+            # Attempt to delete the preset
             success = Config.delete_preset(preset_name)
+
             if success:
                 # Reload presets to get the updated list
                 Config.REFINED_PRESETS = Config.get_presets()
                 logger.info(f"Successfully deleted preset: {preset_name}")
+
+                # Log the number of presets after deletion
+                logger.info(f"Presets after deletion: {len(Config.REFINED_PRESETS)}")
+
                 return jsonify({"success": True, "presets": Config.REFINED_PRESETS})
             else:
-                logger.warning(f"Failed to delete preset (not found): {preset_name}")
-                return jsonify({"error": f"Preset '{preset_name}' not found"}), 404
+                logger.warning(
+                    f"Failed to delete preset (DB operation failed): {preset_name}"
+                )
+                return (
+                    jsonify(
+                        {
+                            "error": f"Failed to delete preset '{preset_name}' from database"
+                        }
+                    ),
+                    500,
+                )
         except Exception as e:
             logger.error(f"Error deleting preset: {e}", exc_info=True)
             return jsonify({"error": f"Error deleting preset: {e}"}), 500
@@ -402,5 +480,266 @@ def create_app():
         except Exception as e:
             logger.error(f"Error in test-json endpoint: {e}", exc_info=True)
             return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+    @app.route("/templates", methods=["GET"])
+    def get_templates() -> Response:
+        """Get all templates from the database.
+
+        Returns:
+            JSON response with all templates
+        """
+        try:
+            templates = Config.get_templates()
+            default_id = Config.get_default_template_id()
+            return jsonify({"templates": templates, "default_template_id": default_id})
+        except Exception as e:
+            logger.error(f"Error retrieving templates: {e}", exc_info=True)
+            return jsonify({"error": f"Error retrieving templates: {e}"}), 500
+
+    @app.route("/templates/<int:template_id>", methods=["GET"])
+    def get_template(template_id: int) -> Response:
+        """Get a specific template by ID.
+
+        Args:
+            template_id: The ID of the template to retrieve
+
+        Returns:
+            JSON response with the template data
+        """
+        try:
+            template = Config.get_template_by_id(template_id)
+            if not template:
+                return (
+                    jsonify({"error": f"Template with ID {template_id} not found"}),
+                    404,
+                )
+            return jsonify({"template": template})
+        except Exception as e:
+            logger.error(f"Error retrieving template {template_id}: {e}", exc_info=True)
+            return jsonify({"error": f"Error retrieving template: {e}"}), 500
+
+    @app.route("/templates", methods=["POST"])
+    def add_template() -> Response:
+        """Add a new template to the database.
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            data = request.get_json()
+
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+
+            name = data.get("name")
+            content = data.get("content")
+            description = data.get("description", "")
+            is_default = data.get("is_default", 0)
+
+            if not name:
+                return jsonify({"error": "Template name is required"}), 400
+            if not content:
+                return jsonify({"error": "Template content is required"}), 400
+
+            # Add the template
+            success, result = Config.add_template(
+                name, content, description, is_default
+            )
+
+            if not success:
+                return jsonify({"error": result}), 400
+
+            # Get all templates to return
+            templates = Config.get_templates()
+            default_id = Config.get_default_template_id()
+
+            return jsonify(
+                {
+                    "message": f"Template '{name}' added successfully with ID {result}",
+                    "template_id": result,
+                    "templates": templates,
+                    "default_template_id": default_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error adding template: {e}", exc_info=True)
+            return jsonify({"error": f"Error adding template: {e}"}), 500
+
+    @app.route("/templates/<int:template_id>", methods=["PUT"])
+    def update_template(template_id: int) -> Response:
+        """Update an existing template.
+
+        Args:
+            template_id: The ID of the template to update
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            data = request.get_json()
+
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+
+            name = data.get("name")
+            content = data.get("content")
+            description = data.get("description", "")
+            is_default = data.get("is_default", 0)
+
+            if not name:
+                return jsonify({"error": "Template name is required"}), 400
+            if not content:
+                return jsonify({"error": "Template content is required"}), 400
+
+            # Update the template
+            success, error = Config.update_template(
+                template_id, name, content, description, is_default
+            )
+
+            if not success:
+                return jsonify({"error": error}), 400 if "not found" in error else 500
+
+            # Get all templates to return
+            templates = Config.get_templates()
+            default_id = Config.get_default_template_id()
+
+            return jsonify(
+                {
+                    "message": f"Template '{name}' updated successfully",
+                    "templates": templates,
+                    "default_template_id": default_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error updating template: {e}", exc_info=True)
+            return jsonify({"error": f"Error updating template: {e}"}), 500
+
+    @app.route("/templates/<int:template_id>", methods=["DELETE"])
+    def delete_template(template_id: int) -> Response:
+        """Delete a template.
+
+        Args:
+            template_id: The ID of the template to delete
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            success, error = Config.delete_template(template_id)
+
+            if not success:
+                return jsonify({"error": error}), 400 if "not found" in error else 500
+
+            # Get all templates to return
+            templates = Config.get_templates()
+            default_id = Config.get_default_template_id()
+
+            return jsonify(
+                {
+                    "message": f"Template with ID {template_id} deleted successfully",
+                    "templates": templates,
+                    "default_template_id": default_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error deleting template: {e}", exc_info=True)
+            return jsonify({"error": f"Error deleting template: {e}"}), 500
+
+    @app.route("/templates/<int:template_id>/set-default", methods=["POST"])
+    def set_default_template(template_id: int) -> Response:
+        """Set a template as the default.
+
+        Args:
+            template_id: The ID of the template to set as default
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            success, error = Config.set_default_template(template_id)
+
+            if not success:
+                return jsonify({"error": error}), 400 if "not found" in error else 500
+
+            # Get all templates to return
+            templates = Config.get_templates()
+
+            return jsonify(
+                {
+                    "message": f"Template with ID {template_id} set as default",
+                    "templates": templates,
+                    "default_template_id": template_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error setting default template: {e}", exc_info=True)
+            return jsonify({"error": f"Error setting default template: {e}"}), 500
+
+    @app.route("/template-manager", methods=["GET"])
+    def template_manager() -> str:
+        """Render the template management page.
+
+        Returns:
+            Rendered HTML template for managing templates
+        """
+        try:
+            templates = Config.get_templates()
+            default_id = Config.get_default_template_id()
+
+            # If no templates exist, initialize the default one
+            if not templates:
+                Config.initialize_default_template()
+                templates = Config.get_templates()
+                default_id = Config.get_default_template_id()
+
+            return render_template(
+                "template_manager.html",
+                templates=templates,
+                default_template_id=default_id,
+            )
+        except Exception as e:
+            logger.error(f"Error rendering template manager: {e}", exc_info=True)
+            flash(f"Error loading templates: {e}", "error")
+            return render_template(
+                "template_manager.html", templates=[], default_template_id=None
+            )
+
+    @app.route("/templates/reset-to-standard", methods=["POST"])
+    def reset_to_standard_templates() -> Response:
+        """Reset to standard templates.
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            conn = sqlite3.connect(str(Config.DB_PATH))
+            cursor = conn.cursor()
+
+            # Delete all existing templates
+            cursor.execute("DELETE FROM templates")
+
+            # Create the standard templates
+            success = Config.create_standard_templates()
+
+            if not success:
+                return jsonify({"error": "Failed to create standard templates"}), 500
+
+            # Get all templates to return
+            templates = Config.get_templates()
+            default_id = Config.get_default_template_id()
+
+            return jsonify(
+                {
+                    "message": "Reset to standard templates successfully",
+                    "templates": templates,
+                    "default_template_id": default_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error resetting to standard templates: {e}", exc_info=True)
+            return (
+                jsonify({"error": f"Error resetting to standard templates: {e}"}),
+                500,
+            )
 
     return app

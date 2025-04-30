@@ -48,9 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Show the modal overlay and preset modal
-        modalOverlay.style.display = 'block';
-        addPresetModal.style.display = 'flex';
+        // Show the modal using the centralized function
+        showModal('add-preset-modal');
         
         // Clear any previous errors
         document.getElementById('preset-error').style.display = 'none';
@@ -78,12 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * Closes the add preset modal
  */
 function closeAddPresetModal() {
-    document.getElementById('add-preset-modal').style.display = 'none';
-    
-    // Only hide the overlay if the prompt modal is also hidden
-    if (document.getElementById('prompt-modal').style.display === 'none') {
-        document.getElementById('modal-overlay').style.display = 'none';
-    }
+    closeModal('add-preset-modal');
 }
 
 /**
@@ -238,17 +232,37 @@ function deletePreset(presetName) {
         return;
     }
     
+    // Show notification that deletion is in progress
+    showToast(`Deleting preset "${presetName}"...`, 'info');
+    
     fetch(`/presets/${encodeURIComponent(presetName)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             showToast(`Error: ${data.error}`, 'error');
+            console.error("Preset deletion error:", data.error);
         } else {
-            // Update presets in UI
+            // Update presets in UI and global variable
+            window.presets = data.presets;
             updatePresets(data.presets);
-            showToast(`Preset "${presetName}" deleted`, 'success');
+            showToast(`Preset "${presetName}" deleted successfully`, 'success');
+            
+            // If preset radio buttons exist, select "None"
+            const noneOption = document.querySelector('input[name="preset"][value=""]');
+            if (noneOption) {
+                noneOption.checked = true;
+            }
         }
     })
     .catch(error => {

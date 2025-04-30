@@ -1,0 +1,520 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Templates - Feature Implementation Prompt Generator{% endblock %}
+
+{% block content %}
+<div class="template-manager">
+    <div class="section-header">
+        <h2>Manage Templates</h2>
+        <div class="header-actions">
+            <button type="button" id="create-template-btn" class="button">
+                <i class="fas fa-plus"></i> Create New Template
+            </button>
+            <button type="button" id="reset-templates-btn" class="button button-secondary">
+                <i class="fas fa-sync"></i> Reset to Standard Templates
+            </button>
+        </div>
+    </div>
+    
+    <div class="templates-list">
+        {% if templates %}
+            <div class="templates-table-wrapper">
+                <table class="templates-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for template in templates %}
+                        <tr data-template-id="{{ template.id }}" {% if template.id == default_template_id %}class="default-template"{% endif %}>
+                            <td>{{ template.name }}</td>
+                            <td>{{ template.description or 'No description' }}</td>
+                            <td>
+                                {% if template.id == default_template_id %}
+                                <span class="badge badge-primary">Default</span>
+                                {% else %}
+                                <button class="set-default-btn" data-template-id="{{ template.id }}">
+                                    Set as default
+                                </button>
+                                {% endif %}
+                            </td>
+                            <td>{{ template.updated_at }}</td>
+                            <td class="actions-cell">
+                                <button class="edit-template-btn action-button" data-template-id="{{ template.id }}" title="Edit template">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="preview-template-btn action-button" data-template-id="{{ template.id }}" title="Preview template">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if template.id != default_template_id %}
+                                <button class="delete-template-btn action-button" data-template-id="{{ template.id }}" title="Delete template">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-file-alt empty-icon"></i>
+                <p>No templates found. Click "Create New Template" to get started.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal Overlay -->
+<div id="modal-overlay" style="display: none;"></div>
+
+<!-- Template Editor Modal -->
+<div id="template-modal" class="modal" style="display: none;">
+    <div class="modal-content template-modal-content">
+        <div class="modal-header">
+            <h2 id="template-modal-title">Create New Template</h2>
+            <button type="button" class="close-modal-button" id="close-template-modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="template-form">
+                <input type="hidden" id="template-id" name="template-id" value="">
+                
+                <div class="form-group">
+                    <label for="template-name">Template Name*</label>
+                    <input type="text" id="template-name" name="template-name" required class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="template-description">Description</label>
+                    <input type="text" id="template-description" name="template-description" class="form-input">
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="is-default-template" name="is-default-template">
+                        Set as default template
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="template-content">Template Content*</label>
+                    <p class="template-help-text">
+                        Use <code>{relevant_code_context}</code>, <code>{jira_description}</code>, and <code>{additional_instructions}</code> as placeholders.
+                    </p>
+                    <div class="template-starter">
+                        <button type="button" id="use-standard-template-btn" class="button button-small button-secondary">
+                            <i class="fas fa-magic"></i> Use Standard Template
+                        </button>
+                    </div>
+                    <textarea id="template-content" name="template-content" class="code-editor" required rows="20"></textarea>
+                </div>
+                
+                <div id="template-form-error" class="form-error" style="display: none;"></div>
+                
+                <div class="form-actions">
+                    <button type="button" id="cancel-template-btn" class="button button-secondary">Cancel</button>
+                    <button type="submit" id="save-template-btn" class="button">Save Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Template Preview Modal -->
+<div id="preview-modal" class="modal" style="display: none;">
+    <div class="modal-content template-modal-content">
+        <div class="modal-header">
+            <h2>Template Preview</h2>
+            <button type="button" class="close-modal-button" id="close-preview-modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <h3 id="preview-template-name"></h3>
+            <div class="preview-content-wrapper">
+                <pre id="preview-content" class="template-preview"></pre>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="close-preview-btn" class="button">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="modal" style="display: none;">
+    <div class="modal-content confirm-modal-content">
+        <div class="modal-header">
+            <h2>Confirm Action</h2>
+            <button type="button" class="close-modal-button" id="close-confirm-modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p id="confirm-message">Are you sure you want to perform this action?</p>
+            <div class="form-actions">
+                <button type="button" id="cancel-confirm-btn" class="button button-secondary">Cancel</button>
+                <button type="button" id="confirm-action-btn" class="button button-danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block additional_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal elements
+    const templateModal = document.getElementById('template-modal');
+    const previewModal = document.getElementById('preview-modal');
+    const confirmModal = document.getElementById('confirm-modal');
+    const modalOverlay = document.getElementById('modal-overlay');
+    
+    // Template form elements
+    const templateForm = document.getElementById('template-form');
+    const templateIdField = document.getElementById('template-id');
+    const templateNameField = document.getElementById('template-name');
+    const templateDescField = document.getElementById('template-description');
+    const isDefaultCheckbox = document.getElementById('is-default-template');
+    const templateContentField = document.getElementById('template-content');
+    const templateFormError = document.getElementById('template-form-error');
+    
+    // Button event listeners
+    document.getElementById('create-template-btn').addEventListener('click', showCreateTemplateModal);
+    document.getElementById('close-template-modal').addEventListener('click', () => closeModal('template-modal'));
+    document.getElementById('cancel-template-btn').addEventListener('click', () => closeModal('template-modal'));
+    document.getElementById('close-preview-modal').addEventListener('click', () => closeModal('preview-modal'));
+    document.getElementById('close-preview-btn').addEventListener('click', () => closeModal('preview-modal'));
+    document.getElementById('close-confirm-modal').addEventListener('click', () => closeModal('confirm-modal'));
+    document.getElementById('cancel-confirm-btn').addEventListener('click', () => closeModal('confirm-modal'));
+    
+    // Reset templates button
+    document.getElementById('reset-templates-btn').addEventListener('click', function() {
+        showResetConfirmation();
+    });
+    
+    // Use standard template button
+    document.getElementById('use-standard-template-btn').addEventListener('click', function() {
+        useStandardTemplate();
+    });
+    
+    // Add event listeners to action buttons
+    document.querySelectorAll('.edit-template-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const templateId = this.getAttribute('data-template-id');
+            loadTemplateForEdit(templateId);
+        });
+    });
+    
+    document.querySelectorAll('.preview-template-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const templateId = this.getAttribute('data-template-id');
+            previewTemplate(templateId);
+        });
+    });
+    
+    document.querySelectorAll('.delete-template-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const templateId = this.getAttribute('data-template-id');
+            showDeleteConfirmation(templateId);
+        });
+    });
+    
+    document.querySelectorAll('.set-default-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const templateId = this.getAttribute('data-template-id');
+            setDefaultTemplate(templateId);
+        });
+    });
+    
+    // Form submission
+    templateForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveTemplate();
+    });
+    
+    // Functions
+    function showCreateTemplateModal() {
+        // Reset form
+        templateForm.reset();
+        templateIdField.value = '';
+        document.getElementById('template-modal-title').textContent = 'Create New Template';
+        templateFormError.style.display = 'none';
+        
+        // Show modal
+        showModal('template-modal');
+    }
+    
+    function loadTemplateForEdit(templateId) {
+        fetch(`/templates/${templateId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    return;
+                }
+                
+                const template = data.template;
+                templateIdField.value = template.id;
+                templateNameField.value = template.name;
+                templateDescField.value = template.description || '';
+                isDefaultCheckbox.checked = template.is_default === 1;
+                templateContentField.value = template.content;
+                
+                document.getElementById('template-modal-title').textContent = 'Edit Template';
+                showModal('template-modal');
+            })
+            .catch(error => {
+                showToast(`Error loading template: ${error}`, 'error');
+            });
+    }
+    
+    function previewTemplate(templateId) {
+        fetch(`/templates/${templateId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    return;
+                }
+                
+                const template = data.template;
+                document.getElementById('preview-template-name').textContent = template.name;
+                document.getElementById('preview-content').textContent = template.content;
+                
+                showModal('preview-modal');
+            })
+            .catch(error => {
+                showToast(`Error loading template preview: ${error}`, 'error');
+            });
+    }
+    
+    function saveTemplate() {
+        const templateId = templateIdField.value;
+        const method = templateId ? 'PUT' : 'POST';
+        const url = templateId ? `/templates/${templateId}` : '/templates';
+        
+        const payload = {
+            name: templateNameField.value,
+            description: templateDescField.value,
+            content: templateContentField.value,
+            is_default: isDefaultCheckbox.checked ? 1 : 0
+        };
+        
+        // Validate
+        if (!payload.name) {
+            showFormError('Template name is required');
+            return;
+        }
+        
+        if (!payload.content) {
+            showFormError('Template content is required');
+            return;
+        }
+        
+        // Check for required placeholders
+        const requiredPlaceholders = ['{relevant_code_context}', '{jira_description}', '{additional_instructions}'];
+        const missingPlaceholders = requiredPlaceholders.filter(placeholder => !payload.content.includes(placeholder));
+        
+        if (missingPlaceholders.length > 0) {
+            showFormError(`Template must include the following placeholders: ${missingPlaceholders.join(', ')}`);
+            return;
+        }
+        
+        // Clear previous errors
+        templateFormError.style.display = 'none';
+        
+        // Disable submit button and show loading state
+        const saveButton = document.getElementById('save-template-btn');
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Reset button state
+            saveButton.disabled = false;
+            saveButton.innerHTML = 'Save Template';
+            
+            if (data.error) {
+                showFormError(data.error);
+                return;
+            }
+            
+            // Success
+            closeModal('template-modal');
+            showToast(data.message, 'success');
+            
+            // Reload the page to show updated templates
+            window.location.reload();
+        })
+        .catch(error => {
+            // Reset button state
+            saveButton.disabled = false;
+            saveButton.innerHTML = 'Save Template';
+            
+            showFormError(`Error saving template: ${error}`);
+        });
+    }
+    
+    function showDeleteConfirmation(templateId) {
+        const templateName = document.querySelector(`tr[data-template-id="${templateId}"] td:first-child`).textContent;
+        document.getElementById('confirm-message').textContent = `Are you sure you want to delete the template "${templateName}"?`;
+        
+        const confirmButton = document.getElementById('confirm-action-btn');
+        confirmButton.textContent = 'Delete';
+        confirmButton.onclick = function() {
+            deleteTemplate(templateId);
+        };
+        
+        showModal('confirm-modal');
+    }
+    
+    function deleteTemplate(templateId) {
+        fetch(`/templates/${templateId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            closeModal('confirm-modal');
+            
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            
+            showToast(data.message, 'success');
+            
+            // Reload the page to update the template list
+            window.location.reload();
+        })
+        .catch(error => {
+            closeModal('confirm-modal');
+            showToast(`Error deleting template: ${error}`, 'error');
+        });
+    }
+    
+    function setDefaultTemplate(templateId) {
+        fetch(`/templates/${templateId}/set-default`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            
+            showToast(data.message, 'success');
+            
+            // Reload the page to update the UI
+            window.location.reload();
+        })
+        .catch(error => {
+            showToast(`Error setting default template: ${error}`, 'error');
+        });
+    }
+    
+    function showResetConfirmation() {
+        document.getElementById('confirm-message').textContent = 'Are you sure you want to reset to standard templates? This will delete all custom templates.';
+        
+        const confirmButton = document.getElementById('confirm-action-btn');
+        confirmButton.textContent = 'Reset';
+        confirmButton.onclick = function() {
+            resetToStandardTemplates();
+        };
+        
+        showModal('confirm-modal');
+    }
+    
+    function resetToStandardTemplates() {
+        fetch('/templates/reset-to-standard', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            closeModal('confirm-modal');
+            
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            
+            showToast(data.message, 'success');
+            
+            // Reload the page to update the template list
+            window.location.reload();
+        })
+        .catch(error => {
+            closeModal('confirm-modal');
+            showToast(`Error resetting templates: ${error}`, 'error');
+        });
+    }
+    
+    function useStandardTemplate() {
+        // Sample standard template to prepopulate
+        const standardTemplate = `# Feature Implementation Prompt
+
+You are a senior software engineer responsible for implementing features in a production environment. **Proceed like a senior software engineer that is responsible for production.** Your task is to implement the feature described below, adhering strictly to the provided context, rules, and coding conventions.
+
+## RULES FOR IMPLEMENTATION
+
+1. **Persona**: Act as a senior software engineer who is responsible for the stability and maintainability of production code.
+2. **Existing Comments**: Do **not** remove any existing comments in the code you modify.
+3. **New Comments**: Add only comments that document the code in a production-ready style (e.g., explaining complex logic or choices).
+4. **Focus**: Implement the requested feature based on the JIRA description and any additional instructions. Use the provided code context to understand the existing system.
+5. **Output**: Provide the complete, modified files containing the new feature implementation.
+
+## RELEVANT CODE CONTEXT
+
+\`\`\`
+{relevant_code_context}
+\`\`\`
+
+## JIRA DESCRIPTION
+
+\`\`\`
+{jira_description}
+\`\`\`
+
+## ADDITIONAL INSTRUCTIONS
+
+\`\`\`
+{additional_instructions}
+\`\`\`
+
+## IMPLEMENTATION TASK
+
+Based on all the information provided above, please implement the required feature. Output the complete code for any new or modified files.`;
+        
+        // Set the content in the textarea
+        templateContentField.value = standardTemplate;
+        
+        // Show confirmation toast
+        showToast('Standard template applied', 'success');
+    }
+    
+    function showFormError(message) {
+        templateFormError.textContent = message;
+        templateFormError.style.display = 'block';
+        templateFormError.scrollIntoView({ behavior: 'smooth' });
+    }
+});
+</script>
+{% endblock %} 

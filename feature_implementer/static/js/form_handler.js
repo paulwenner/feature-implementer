@@ -48,8 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function handleFormSubmit(form) {
         // Show the modal with loading indicator
-        promptModal.style.display = 'block';
-        modalOverlay.style.display = 'block';
+        showModal('prompt-modal');
         promptContent.style.display = 'none';
         loadingIndicator.style.display = 'block';
         errorArea.style.display = 'none';
@@ -171,6 +170,5 @@ function initPresetSelector() {
  * Closes the prompt modal dialog
  */
 function closePromptModal() {
-    document.getElementById('prompt-modal').style.display = 'none';
-    document.getElementById('modal-overlay').style.display = 'none';
+    closeModal('prompt-modal');
 } 

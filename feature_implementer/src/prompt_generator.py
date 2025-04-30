@@ -41,7 +41,9 @@ def gather_context(file_paths: List[Union[Path, str]]) -> str:
 
 
 def generate_prompt(
-    template_path: Union[Path, str] = Config.DEFAULT_TEMPLATE,
+    template_path: Optional[Union[Path, str]] = None,
+    template_id: Optional[int] = None,
+    template_content: Optional[str] = None,
     context_files: List[Union[Path, str]] = [],
     jira_description: str = "",
     additional_instructions: str = "",
@@ -49,7 +51,9 @@ def generate_prompt(
     """Generate a complete implementation prompt with file context.
 
     Args:
-        template_path: Path to the template file
+        template_path: Path to the template file (optional)
+        template_id: ID of the template in the database (optional)
+        template_content: Direct template content string (optional)
         context_files: List of paths to include as code context
         jira_description: JIRA ticket description text
         additional_instructions: Additional implementation instructions
@@ -58,21 +62,40 @@ def generate_prompt(
         Complete formatted prompt string
 
     Raises:
-        ValueError: If template file could not be read
+        ValueError: If template could not be loaded
     """
     logger = logging.getLogger(__name__)
 
-    # Ensure template_path is a Path object
-    template_path_obj = (
-        Path(template_path) if not isinstance(template_path, Path) else template_path
-    )
+    # Determine template content source (content string, db ID, or file path)
+    template_content_final = None
 
-    template_content = read_file_content(template_path_obj)
-    if not template_content:
-        logger.error(f"Template file {template_path} could not be read or is empty.")
-        raise ValueError(
-            f"Template file {template_path} could not be read or is empty."
-        )
+    # If direct content is provided, use it
+    if template_content:
+        template_content_final = template_content
+    # Otherwise if an ID is provided, fetch from database
+    elif template_id:
+        template_data = Config.get_template_by_id(template_id)
+        if template_data and "content" in template_data:
+            template_content_final = template_data["content"]
+        else:
+            logger.error(f"Template with ID {template_id} not found or has no content")
+    # Otherwise use the template file path (default if none provided)
+    else:
+        template_path_obj = Config.DEFAULT_TEMPLATE
+        if template_path:
+            template_path_obj = (
+                Path(template_path)
+                if not isinstance(template_path, Path)
+                else template_path
+            )
+
+        logger.info(f"Using template file: {template_path_obj}")
+        template_content_final = read_file_content(template_path_obj)
+
+    # Validate that we have template content
+    if not template_content_final:
+        logger.error("Template could not be loaded")
+        raise ValueError("Template could not be loaded")
 
     # Process Jira description if it's a file path
     jira_description_final = ""
@@ -114,7 +137,7 @@ def generate_prompt(
     relevant_code_context = gather_context(context_files)
 
     # Use placeholders if any input is effectively empty
-    final_prompt = template_content.format(
+    final_prompt = template_content_final.format(
         relevant_code_context=relevant_code_context if relevant_code_context else "N/A",
         jira_description=jira_description_final if jira_description_final else "N/A",
         additional_instructions=(

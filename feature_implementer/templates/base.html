@@ -5,13 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Feature Implementation Prompt Generator{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/toast.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     {% block additional_head %}{% endblock %}
 </head>
 <body>
     <div class="app-container">
         <header class="header">
-            <h1 class="title">Feature Implementation Prompt Generator</h1>
+            <div class="title-area">
+                <h1 class="title">Feature Implementation Prompt Generator</h1>
+                <nav class="main-nav">
+                    <a href="{{ url_for('index') }}" class="nav-link {% if request.path == url_for('index') %}active{% endif %}">
+                        <i class="fas fa-home"></i> Home
+                    </a>
+                    <a href="{{ url_for('template_manager') }}" class="nav-link {% if request.path == url_for('template_manager') %}active{% endif %}">
+                        <i class="fas fa-file-code"></i> Templates
+                    </a>
+                </nav>
+            </div>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">
                 <i class="fas fa-moon"></i>
             </button>

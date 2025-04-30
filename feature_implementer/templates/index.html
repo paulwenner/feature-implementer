@@ -3,7 +3,9 @@
 
 {% block additional_head %}
 <script>
-    const presets = JSON.parse('{{ presets_json | safe }}');
+    var presets = JSON.parse('{{ presets_json | safe }}');
+    var templates = JSON.parse('{{ templates_json | safe }}');
+    var defaultTemplateId = {{ default_template_id | tojson | safe }};
 </script>
 {% endblock %}
 
@@ -41,7 +43,7 @@
             <div class="file-preview-header">
                 <span id="preview-filename"></span>
                 <button type="button" class="close-preview-button" onclick="closeFilePreview()" title="Close preview" style="display: none;">
-                    <i class="fas fa-times"></i>
+                    <i class="fas fa-xmark"></i>
                 </button>
             </div>
             <pre class="file-preview-content" id="preview-content"></pre>
@@ -58,6 +60,22 @@
             {% endwith %}
             
             <div class="form-section">
+                <div class="template-selector section">
+                    <h3 class="section-title">Prompt Template</h3>
+                    <div class="template-select-wrapper">
+                        <select id="template-selector" name="template_id" class="form-select">
+                            {% for template in templates %}
+                                <option value="{{ template.id }}" {% if template.id == default_template_id %}selected{% endif %}>
+                                    {{ template.name }}{% if template.id == default_template_id %} (Default){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <a href="{{ url_for('template_manager') }}" class="button button-small">
+                            <i class="fas fa-cog"></i> Manage Templates
+                        </a>
+                    </div>
+                </div>
+                
                 <div class="preset-selector section">
                     <h3 class="section-title">Service Presets</h3>
                     <div class="preset-options">
@@ -107,21 +125,23 @@
 {% endblock %}
 
 {% block modals %}
-<!-- Modal Structure -->
+<!-- Modal Overlay -->
 <div id="modal-overlay" style="display: none;"></div>
-<div id="prompt-modal" style="display: none;">
+
+<!-- Prompt Modal -->
+<div id="prompt-modal" class="modal" style="display: none;">
     <div class="prompt-header">
         <h2>Generated Prompt</h2>
         <div class="prompt-meta">
             <span id="char-count-info"></span>
             <span id="token-estimate-info"></span>
         </div>
-        <div class="prompt-actions">
+        <div class="prompt-actions" style="margin-right: 1rem;">
             <button id="copy-button" class="button button-small button-secondary" title="Copy to Clipboard"><i class="fas fa-copy"></i> Copy</button>
             <button id="export-button" class="button button-small button-secondary" title="Export as Markdown"><i class="fas fa-file-download"></i> Export (.md)</button>
         </div>
         <button type="button" class="close-modal-button" onclick="closePromptModal()" title="Close">
-            <i class="fas fa-times"></i>
+            <i class="fas fa-xmark"></i>
         </button>
     </div>
     <pre id="prompt-modal-content" style="max-height: 80vh; overflow-y: auto; white-space: pre-wrap;"></pre>
@@ -132,14 +152,14 @@
 </div>
 
 <!-- Add Preset Modal -->
-<div id="add-preset-modal" style="display: none;">
+<div id="add-preset-modal" class="modal" style="display: none;">
     <div class="modal-header">
         <h2>Save Selected Files as Preset</h2>
         <button type="button" class="close-modal-button" onclick="closeAddPresetModal()" title="Close">
-            <i class="fas fa-times"></i>
+            <i class="fas fa-xmark"></i>
         </button>
     </div>
-    <div class="modal-content">
+    <div class="modal-content" style="padding: 20px;">
         <div class="form-group">
             <label for="preset-name">Preset Name:</label>
             <input type="text" id="preset-name" class="form-input" placeholder="Enter a name for this preset">
@@ -154,9 +174,19 @@
         <button type="button" class="button" id="save-preset-button">Save Preset</button>
     </div>
 </div>
+
+<script>
+function closePromptModal() {
+    const promptModal = document.getElementById('prompt-modal');
+    const modalOverlay = document.getElementById('modal-overlay');
+    if (promptModal) promptModal.style.display = 'none';
+    if (modalOverlay) modalOverlay.style.display = 'none';
+}
+</script>
 {% endblock %}
 
 {% block additional_scripts %}
+<script src="{{ url_for('static', filename='js/modal_utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/file_explorer.js') }}"></script>
 <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
 <script src="{{ url_for('static', filename='js/preset_handler.js') }}"></script>

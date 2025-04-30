@@ -5,6 +5,7 @@ A tool to generate feature implementation prompts for software development proje
 ## Features
 
 - Browse and select files from your codebase for context
+- Create and manage custom prompt templates
 - Add Jira tickets and custom instructions
 - Generate a comprehensive prompt for LLM-assisted feature implementation
 - Export prompts to Markdown files
@@ -35,6 +36,7 @@ feature_implementer/
 │   ├── base.html          # Base template with common elements
 │   ├── index.html         # Main page
 │   ├── macros.html        # Reusable template components
+│   ├── template_manager.html # Template management page
 ├── outputs/               # Generated output directory
 └── Dockerfile             # Docker configuration
 ```
@@ -82,3 +84,39 @@ feature_implementer/
 4. Add any additional implementation instructions
 5. Click "Generate Prompt"
 6. Copy or export the generated prompt for use with an LLM 
+
+## Template Management
+
+The application allows you to create and manage custom prompt templates for different use cases:
+
+1. Navigate to the Templates page
+2. Create a new template with placeholders:
+   - `{relevant_code_context}` - Selected code files
+   - `{jira_description}` - Jira ticket details
+   - `{additional_instructions}` - Any extra notes
+3. Set a template as default for all new prompts
+4. Templates are stored in a SQLite database for persistence
+
+## CLI Usage
+
+The application also provides a command-line interface for generating prompts:
+
+```
+python -m src.cli --context-files path/to/file1.py path/to/file2.py --jira "Jira ticket details" --instructions "Implementation notes"
+```
+
+For template management via CLI:
+
+```
+# List all templates
+python -m src.cli --list-templates
+
+# Create a new template
+python -m src.cli --create-template "My Template" --template-content path/to/template.md --template-description "Template description"
+
+# Set a template as default
+python -m src.cli --set-default TEMPLATE_ID
+
+# Use a specific template
+python -m src.cli --template-id TEMPLATE_ID --context-files path/to/file.py
+``` 
