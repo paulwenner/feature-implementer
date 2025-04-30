@@ -75,6 +75,12 @@
                 <div id="selected-files-list">
                     <p class="text-secondary">No files selected yet. Click the + button next to files to add them.</p>
                 </div>
+                <!-- Add button for adding presets -->
+                <div class="preset-actions" style="margin-top: 10px;">
+                    <button type="button" id="add-preset-button" class="button button-small button-secondary" style="display: none;">
+                        <i class="fas fa-plus"></i> Save as Preset
+                    </button>
+                </div>
                 <!-- Hidden input to ensure form submission even if no files selected -->
                 <input type="hidden" name="form_submitted" value="1">
             </div>
@@ -124,9 +130,34 @@
     </div>
     <div id="prompt-error-area" class="alert alert-error" style="display: none;"></div>
 </div>
+
+<!-- Add Preset Modal -->
+<div id="add-preset-modal" style="display: none;">
+    <div class="modal-header">
+        <h2>Save Selected Files as Preset</h2>
+        <button type="button" class="close-modal-button" onclick="closeAddPresetModal()" title="Close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="modal-content">
+        <div class="form-group">
+            <label for="preset-name">Preset Name:</label>
+            <input type="text" id="preset-name" class="form-input" placeholder="Enter a name for this preset">
+        </div>
+        <div id="preset-files-summary">
+            <!-- Will be populated with JavaScript -->
+        </div>
+        <div id="preset-error" class="alert alert-error" style="display: none;"></div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="button button-secondary" onclick="closeAddPresetModal()">Cancel</button>
+        <button type="button" class="button" id="save-preset-button">Save Preset</button>
+    </div>
+</div>
 {% endblock %}
 
 {% block additional_scripts %}
 <script src="{{ url_for('static', filename='js/file_explorer.js') }}"></script>
 <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/preset_handler.js') }}"></script>
 {% endblock %} 

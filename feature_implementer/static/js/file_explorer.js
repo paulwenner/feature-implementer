@@ -71,6 +71,8 @@ function updateSelectedFilesList() {
     const checked = document.querySelectorAll('input[name="context_files"]:checked');
     if (checked.length === 0) {
         list.innerHTML = '<p class="text-secondary">No files selected yet. Click the + button next to files to add them.</p>';
+        // Dispatch custom event for empty selection
+        document.dispatchEvent(new CustomEvent('selectedFilesChanged', { detail: { count: 0 } }));
         return;
     }
     let html = '<ul class="selected-files">';
@@ -87,6 +89,11 @@ function updateSelectedFilesList() {
     });
     html += '</ul>';
     list.innerHTML = html;
+    
+    // Dispatch custom event with selection count
+    document.dispatchEvent(new CustomEvent('selectedFilesChanged', { 
+        detail: { count: checked.length } 
+    }));
 }
 
 function removeFile(filepath) {
@@ -402,10 +409,48 @@ function restoreSelectedFiles(selectedFiles) {
     updateSelectedFilesList();
 }
 
-// Utility function for showing toast messages (assuming you have a toast mechanism)
+// Utility function for showing toast messages
 function showToast(message, type = 'info') {
-    // Replace this with your actual toast implementation
     console.log(`[${type.toUpperCase()}] ${message}`);
-    // Example: alert(`[${type.toUpperCase()}] ${message}`);
-    // Or integrate with a library like Toastify.js
+    
+    // Check if toast container exists, if not create it
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    // Create toast content with icon based on type
+    let icon = 'info-circle';
+    if (type === 'error') icon = 'exclamation-circle';
+    if (type === 'success') icon = 'check-circle';
+    if (type === 'warning') icon = 'exclamation-triangle';
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${icon}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Add to container
+    toastContainer.appendChild(toast);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        toast.classList.add('toast-fade-out');
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 300); // Match the animation duration
+    }, 5000);
 } 

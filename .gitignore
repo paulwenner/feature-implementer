@@ -67,9 +67,8 @@ coverage.xml
 *.cover
 *.coverage.*
 
-# DS Store
-.DS_Store
-
 # Cursor Rules
 .cursorrules
 
+#DS store
+.DS_Store

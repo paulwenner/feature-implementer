@@ -38,6 +38,14 @@ def create_app():
 
     logger = logging.getLogger(__name__)
 
+    # Load presets at startup
+    try:
+        Config.REFINED_PRESETS = Config.get_presets()
+        logger.info(f"Loaded {len(Config.REFINED_PRESETS)} presets from database")
+    except Exception as e:
+        logger.error(f"Failed to load presets: {e}", exc_info=True)
+        Config.REFINED_PRESETS = {}
+
     # Pre-populate the file tree cache on startup
     try:
         logger.info("Performing initial file tree scan...")
@@ -68,14 +76,16 @@ def create_app():
                 logger.error(f"Error reading template preview: {template_error}")
                 template_preview = "Error loading template preview."
 
-            presets_json = json.dumps(Config.REFINED_PRESETS)
+            # Get the latest presets from the database
+            presets = Config.REFINED_PRESETS
+            presets_json = json.dumps(presets)
 
             return render_template(
                 "index.html",
                 file_tree=file_tree,
                 scan_dirs=Config.SCAN_DIRS,
                 template_preview=template_preview,
-                presets=Config.REFINED_PRESETS,
+                presets=presets,
                 presets_json=presets_json,
             )
         except Exception as e:
@@ -199,6 +209,96 @@ def create_app():
             logger.error(f"Error reading file: {e}", exc_info=True)
             return jsonify({"error": f"Error reading file: {e}"}), 500
 
+    @app.route("/presets", methods=["GET"])
+    def get_presets() -> Response:
+        """Get all available presets.
+
+        Returns:
+            JSON response with all presets
+        """
+        try:
+            # Use the cached presets rather than calling the method again
+            presets = Config.REFINED_PRESETS
+            return jsonify({"presets": presets})
+        except Exception as e:
+            logger.error(f"Error retrieving presets: {e}", exc_info=True)
+            return jsonify({"error": f"Error retrieving presets: {e}"}), 500
+
+    @app.route("/presets", methods=["POST"])
+    def add_preset() -> Response:
+        """Add a new preset.
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            data = request.get_json()
+
+            if not data:
+                logger.error("No JSON data received in add_preset request")
+                return jsonify({"error": "No data provided or invalid JSON"}), 400
+
+            name = data.get("name")
+            files = data.get("files")
+
+            logger.info(
+                f"Adding preset: name={name}, files count={len(files) if files else 0}"
+            )
+
+            if not name:
+                return jsonify({"error": "Preset name is required"}), 400
+            if not files or not isinstance(files, list):
+                return jsonify({"error": "Selected files list is required"}), 400
+
+            # Validate files - ensure all are strings
+            if not all(isinstance(f, str) for f in files):
+                logger.warning(f"Non-string file paths detected: {files}")
+                files = [str(f) for f in files]
+
+            # Add the preset
+            success = Config.add_preset(name, files)
+            if success:
+                # Reload presets to get the updated list
+                Config.REFINED_PRESETS = Config.get_presets()
+                return jsonify({"success": True, "presets": Config.REFINED_PRESETS})
+            else:
+                return (
+                    jsonify({"error": f"Preset with name '{name}' already exists"}),
+                    400,
+                )
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in add_preset: {e}")
+            return jsonify({"error": f"Invalid JSON format: {str(e)}"}), 400
+        except Exception as e:
+            logger.error(f"Error adding preset: {e}", exc_info=True)
+            # Ensure we return JSON, not HTML error page
+            return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+    @app.route("/presets/<preset_name>", methods=["DELETE"])
+    def delete_preset_by_name(preset_name: str) -> Response:
+        """Delete a preset by name.
+
+        Args:
+            preset_name: The name of the preset to delete
+
+        Returns:
+            JSON response indicating success or error
+        """
+        try:
+            logger.info(f"Attempting to delete preset: {preset_name}")
+            success = Config.delete_preset(preset_name)
+            if success:
+                # Reload presets to get the updated list
+                Config.REFINED_PRESETS = Config.get_presets()
+                logger.info(f"Successfully deleted preset: {preset_name}")
+                return jsonify({"success": True, "presets": Config.REFINED_PRESETS})
+            else:
+                logger.warning(f"Failed to delete preset (not found): {preset_name}")
+                return jsonify({"error": f"Preset '{preset_name}' not found"}), 404
+        except Exception as e:
+            logger.error(f"Error deleting preset: {e}", exc_info=True)
+            return jsonify({"error": f"Error deleting preset: {e}"}), 500
+
     @app.route("/refresh_file_tree", methods=["GET"])
     def refresh_file_tree() -> Response:
         """Rescan the file tree and return the rendered HTML."""
@@ -267,5 +367,40 @@ def create_app():
             )
         except Exception as e:
             return jsonify({"error": f"Error rescanning files: {e}"}), 500
+
+    @app.route("/debug/test-json", methods=["POST"])
+    def test_json() -> Response:
+        """Test endpoint for debugging JSON parsing issues.
+
+        Returns:
+            JSON response with the parsed data
+        """
+        try:
+            logger.info(f"Received test-json request: {request.content_type}")
+            logger.info(f"Request headers: {dict(request.headers)}")
+
+            # Try to get JSON data
+            data = request.get_json(silent=True)
+
+            if data is None:
+                # If silent=True didn't work, try to read the raw data
+                raw_data = request.get_data(as_text=True)
+                logger.info(f"Raw request data: {raw_data[:1000]}")
+                return (
+                    jsonify(
+                        {
+                            "error": "Failed to parse JSON",
+                            "content_type": request.content_type,
+                            "raw_data_sample": raw_data[:100] if raw_data else None,
+                        }
+                    ),
+                    400,
+                )
+
+            # Successfully got JSON
+            return jsonify({"success": True, "received_data": data})
+        except Exception as e:
+            logger.error(f"Error in test-json endpoint: {e}", exc_info=True)
+            return jsonify({"error": f"Server error: {str(e)}"}), 500
 
     return app
