@@ -1,6 +1,18 @@
 /**
  * Handles theme switching between light and dark modes
  */
+
+// Immediately apply theme to prevent flickering during page loads
+function applyThemeImmediately() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+}
+
+// Main theme toggle functionality when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     const themeToggle = document.getElementById('theme-toggle');
     const htmlElement = document.documentElement;
@@ -11,10 +23,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check saved preference or system preference
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) {
-            htmlElement.setAttribute('data-theme', savedTheme);
+            // We already set the data-theme attribute, just update the icon
             updateThemeIcon(savedTheme, icon);
         } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            htmlElement.setAttribute('data-theme', 'dark');
+            // We already set the data-theme attribute, just update the icon
             updateThemeIcon('dark', icon);
         }
         

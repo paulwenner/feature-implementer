@@ -3,11 +3,19 @@
  */
 document.addEventListener('DOMContentLoaded', function() {
     initFileExplorer();
+    // Unwrap root folder: show only its contents
+    unwrapRootFolder();
+    // Sort root entries: folders first, then files, alphabetically
+    sortFileTree(document.querySelector('.file-tree'));
     updateSelectedFilesList();
     // Add listener for the refresh button
     const refreshButton = document.getElementById('refresh-file-tree-button');
     if (refreshButton) {
-        refreshButton.addEventListener('click', refreshFileTree);
+        refreshButton.addEventListener('click', async () => {
+            await refreshFileTree();
+            unwrapRootFolder();
+            sortFileTree(document.querySelector('.file-tree'));
+        });
     }
 });
 
@@ -134,6 +142,8 @@ function toggleFilePreview(filepath, filename) {
         return closeFilePreview();
     }
 
+    // Ensure preview area is visible if previously hidden
+    area.style.display = 'block';
     area.classList.add('show');
     nameEl.textContent = filename;
     contentEl.textContent = 'Loading file content...';
@@ -453,4 +463,94 @@ function showToast(message, type = 'info') {
             }
         }, 300); // Match the animation duration
     }, 5000);
-} 
+}
+
+/**
+ * Removes the top-level folder label and moves its children into the tree container,
+ * so only the contents of the root are shown.
+ */
+function unwrapRootFolder() {
+    const tree = document.querySelector('.file-tree');
+    if (!tree) return;
+    const rootLabel = tree.querySelector('.folder-label');
+    const rootContent = rootLabel?.nextElementSibling;
+    if (rootContent && rootContent.classList.contains('folder-content')) {
+        tree.innerHTML = rootContent.innerHTML;
+    }
+}
+
+/**
+ * Sorts direct children so that folder nodes come before file nodes, both alphabetically.
+ */
+function sortFileTree(container) {
+    if (!container) return;
+    
+    // Group direct children into folder units (wrapper elements) or file items
+    const children = Array.from(container.children);
+    if (children.length === 0) return;
+    
+    const groups = [];
+    for (let i = 0; i < children.length; i++) {
+        const el = children[i];
+        
+        // Check different ways to identify folders vs files
+        if (el.classList.contains('folder') || el.classList.contains('directory-section')) {
+            // Element has folder class directly
+            const nameEl = el.querySelector('.folder-name');
+            const name = nameEl ? nameEl.textContent.trim().toLowerCase() : '';
+            groups.push({ type: 'folder', name, elements: [el] });
+        } 
+        else if (el.querySelector('.folder-label')) {
+            // Element contains a folder label
+            const nameEl = el.querySelector('.folder-name');
+            const name = nameEl ? nameEl.textContent.trim().toLowerCase() : '';
+            groups.push({ type: 'folder', name, elements: [el] });
+        } 
+        else if (el.classList.contains('file')) {
+            // Element has file class
+            const fileNameEl = el.querySelector('.filename');
+            const name = fileNameEl ? fileNameEl.textContent.trim().toLowerCase() : '';
+            groups.push({ type: 'file', name, elements: [el] });
+        }
+        else if (el.querySelector('.file-label') || el.querySelector('.file-info')) {
+            // Element contains file elements
+            const fileNameEl = el.querySelector('.filename');
+            const name = fileNameEl ? fileNameEl.textContent.trim().toLowerCase() : '';
+            groups.push({ type: 'file', name, elements: [el] });
+        }
+        else {
+            // Unknown element, assume file for safety
+            const name = el.textContent.trim().toLowerCase();
+            groups.push({ type: 'unknown', name, elements: [el] });
+        }
+    }
+    
+    // Sort groups: folders first, then files; alphabetical within each group
+    groups.sort((a, b) => {
+        // First sort by type: folder -> file -> unknown
+        if (a.type === 'folder' && b.type !== 'folder') return -1;
+        if (a.type !== 'folder' && b.type === 'folder') return 1;
+        
+        // Then alphabetically within the same type
+        return a.name.localeCompare(b.name);
+    });
+    
+    // Remove all children first
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+    
+    // Re-append in sorted order
+    groups.forEach(group => {
+        group.elements.forEach(el => container.appendChild(el));
+    });
+    
+    // Recursively sort folder contents
+    const folderContents = container.querySelectorAll('.folder-content');
+    folderContents.forEach(content => {
+        // Don't sort empty containers
+        if (content.children.length > 0) {
+            sortFileTree(content);
+        }
+    });
+}

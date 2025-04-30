@@ -386,46 +386,14 @@ def create_app():
             # Force rescan using configured directories
             file_tree = get_file_tree(Config.SCAN_DIRS, force_rescan=True)
 
-            # Construct the HTML snippet using the macro
-            # We need the macro definition available here.
-            # We'll reuse the logic from index.html's rendering.
-            # NOTE: This requires Jinja context processors or passing the macro explicitly if not default.
-            # Assuming render_template_string can access the macro via the app's env.
-
-            html_parts = []
-            # Import the macro rendering function directly within the context
-            # This assumes macros.html is correctly located relative to templates folder
-            macro_import_string = "{% from 'macros.html' import render_file_tree %}"
-
-            for dir_name, dir_content in file_tree.items():
-                if isinstance(
-                    dir_content, dict
-                ):  # Check if it's a directory structure, not an error
-                    # Render the tree for this top-level directory using the macro
-                    render_call = (
-                        f"{{{{ render_file_tree({{'{dir_name}': dir_content}}, 0) }}}}"
-                    )
-                    # Use render_template_string which allows using Jinja syntax
-                    rendered_part = render_template_string(
-                        f"{macro_import_string}<div class='directory-section'>{render_call}</div>",
-                        dir_content=dir_content,  # Pass necessary context
-                    )
-                    html_parts.append(rendered_part)
-                elif isinstance(dir_content, dict) and "error" in dir_content:
-                    html_parts.append(
-                        f'<p class="error">{dir_content["error"]}</p>'
-                    )  # Display error
-                else:  # Handle unexpected structure or top-level files if necessary
-                    logger.warning(
-                        f"Unexpected structure in file tree for key: {dir_name}"
-                    )
-                    html_parts.append(
-                        f'<p class="error">Unexpected content for {dir_name}</p>'
-                    )
-
-            final_html = "\\n".join(html_parts)
+            # Render the entire file tree with one macro call
+            macro_import = "{% from 'macros.html' import render_file_tree %}"
+            rendered = render_template_string(
+                f"{macro_import}{{{{ render_file_tree(file_tree, 0) }}}}",
+                file_tree=file_tree,
+            )
             logger.info("File tree refreshed and HTML generated.")
-            return jsonify({"html": final_html})
+            return jsonify({"html": rendered})
 
         except Exception as e:
             logger.error(f"Error refreshing file tree: {e}", exc_info=True)
