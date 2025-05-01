@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', function() {
             sortFileTree(document.querySelector('.file-tree'));
         });
     }
+    
+    // Initialize file search functionality
+    initFileSearch();
 });
 
 function initFileExplorer() {
@@ -175,7 +178,6 @@ function addFileToContext(filepath, filename) {
     if (checkbox) {
         checkbox.checked = true;
         updateSelectedFilesList();
-        showToast(`Added "${filename}"`, 'success');
     }
 }
 
@@ -553,4 +555,317 @@ function sortFileTree(container) {
             sortFileTree(content);
         }
     });
+}
+
+/**
+ * Initializes the file search functionality.
+ */
+function initFileSearch() {
+    const searchInput = document.getElementById('file-search-input');
+    const clearSearchButton = document.getElementById('clear-search-button');
+    const closeSearchButton = document.getElementById('close-search-button');
+    const fileTree = document.querySelector('.file-tree');
+    const searchResults = document.getElementById('search-results');
+    
+    if (!searchInput || !fileTree || !searchResults) return;
+    
+    // Add event listener for search input
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Toggle clear button visibility
+        clearSearchButton.style.display = query ? 'block' : 'none';
+        
+        if (query.length >= 2) {
+            // Perform search with at least 2 characters
+            performSearch(query);
+        } else {
+            // Hide search results if query is less than 2 characters
+            searchResults.style.display = 'none';
+            fileTree.style.display = 'block';
+        }
+    });
+    
+    // Add event listener for clear button
+    clearSearchButton.addEventListener('click', function() {
+        searchInput.value = '';
+        clearSearchButton.style.display = 'none';
+        searchResults.style.display = 'none';
+        fileTree.style.display = 'block';
+    });
+    
+    // Add event listener for close search button
+    closeSearchButton.addEventListener('click', function() {
+        searchResults.style.display = 'none';
+        fileTree.style.display = 'block';
+    });
+    
+    // Add event listener for keyboard navigation
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            // Clear search on Escape key
+            searchInput.value = '';
+            clearSearchButton.style.display = 'none';
+            searchResults.style.display = 'none';
+            fileTree.style.display = 'block';
+        }
+    });
+}
+
+/**
+ * Performs a file search based on the given query.
+ * @param {string} query - The search query to match against file names and paths.
+ */
+function performSearch(query) {
+    const fileTree = document.querySelector('.file-tree');
+    const searchResults = document.getElementById('search-results');
+    const searchResultsList = document.getElementById('search-results-list');
+    const searchResultCount = document.getElementById('search-result-count');
+    
+    if (!fileTree || !searchResults || !searchResultsList) return;
+    
+    // Case-insensitive search
+    const normalizedQuery = query.toLowerCase();
+    
+    // Collect file info from the DOM tree
+    const files = collectFileInfo(fileTree);
+    
+    // Split the query by "/" to support path-based searches like "menu/index"
+    const queryParts = normalizedQuery.split('/').filter(part => part.trim());
+    
+    // Filter files based on the search query
+    const matchedFiles = files.filter(file => {
+        // First check if the file name contains the entire query
+        if (file.name.toLowerCase().includes(normalizedQuery)) {
+            return true;
+        }
+        
+        // Check if the file path contains the entire query (path-based search)
+        if (file.path.toLowerCase().includes(normalizedQuery)) {
+            return true;
+        }
+        
+        // If the query contains path separators, do a more specific path match
+        if (queryParts.length > 1) {
+            const filePath = file.path.toLowerCase();
+            
+            // Check if all path parts are found in order
+            let lastFoundIndex = -1;
+            const allPartsFound = queryParts.every(part => {
+                const partIndex = filePath.indexOf(part, lastFoundIndex + 1);
+                if (partIndex === -1) return false;
+                lastFoundIndex = partIndex;
+                return true;
+            });
+            
+            if (allPartsFound) return true;
+            
+            // Check if the query matches the last part of the path (directory + filename)
+            const pathDirAndFile = file.path.toLowerCase().split('/').slice(-queryParts.length).join('/');
+            if (pathDirAndFile === queryParts.join('/')) {
+                return true;
+            }
+        }
+        
+        return false;
+    });
+    
+    // Update UI
+    fileTree.style.display = 'none';
+    searchResults.style.display = 'flex';
+    
+    // Update result count
+    const resultText = matchedFiles.length === 1 
+        ? '1 result' 
+        : `${matchedFiles.length} results`;
+    searchResultCount.textContent = resultText;
+    
+    // Render search results
+    if (matchedFiles.length > 0) {
+        renderSearchResults(searchResultsList, matchedFiles, normalizedQuery);
+    } else {
+        searchResultsList.innerHTML = `
+            <div class="search-empty-state">
+                <p>No matching files found for "${query}"</p>
+                <p>Try a different search term</p>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Collects file information from the file tree DOM.
+ * @param {HTMLElement} fileTree - The file tree container element.
+ * @returns {Array<Object>} An array of file objects with name, path, and element information.
+ */
+function collectFileInfo(fileTree) {
+    const files = [];
+    
+    // Find all file labels in the tree
+    const fileLabels = fileTree.querySelectorAll('.file-label');
+    
+    fileLabels.forEach(label => {
+        const checkbox = label.querySelector('input[type="checkbox"]');
+        if (!checkbox) return;
+        
+        const fileNameEl = label.querySelector('.filename');
+        if (!fileNameEl) return;
+        
+        const fileName = fileNameEl.textContent.trim();
+        const filePath = checkbox.value;
+        const checkboxId = checkbox.id;
+        
+        // Calculate and store path components for better path-based search
+        const pathParts = filePath.split('/');
+        
+        files.push({
+            name: fileName,
+            path: filePath,
+            fullPath: filePath, // Original full path
+            checkboxId: checkboxId,
+            element: label,
+            pathParts: pathParts
+        });
+    });
+    
+    return files;
+}
+
+/**
+ * Renders the search results in the search results list.
+ * @param {HTMLElement} container - The container to render results in.
+ * @param {Array<Object>} results - The matching file results.
+ * @param {string} query - The search query for highlighting.
+ */
+function renderSearchResults(container, results, query) {
+    container.innerHTML = '';
+    
+    results.forEach(file => {
+        // Create a result item element
+        const resultItem = document.createElement('div');
+        resultItem.className = 'search-result-item';
+        
+        // Get file type for icon
+        const fileExt = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+        let fileIcon = 'fa-file';
+        
+        // Customize icon based on file type
+        if (['js', 'ts', 'jsx', 'tsx'].includes(fileExt)) {
+            fileIcon = 'fa-file-code';
+        } else if (['html', 'htm', 'xml'].includes(fileExt)) {
+            fileIcon = 'fa-file-code';
+        } else if (['css', 'scss', 'sass', 'less'].includes(fileExt)) {
+            fileIcon = 'fa-file-code';
+        } else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(fileExt)) {
+            fileIcon = 'fa-file-image';
+        } else if (['md', 'txt', 'log'].includes(fileExt)) {
+            fileIcon = 'fa-file-alt';
+        } else if (['pdf'].includes(fileExt)) {
+            fileIcon = 'fa-file-pdf';
+        } else if (['zip', 'rar', 'tar', 'gz'].includes(fileExt)) {
+            fileIcon = 'fa-file-archive';
+        }
+        
+        // Highlight matched parts in filename and path
+        const highlightedName = highlightMatches(file.name, query);
+        const highlightedPath = highlightMatches(file.path, query);
+        
+        // Build result item HTML
+        resultItem.innerHTML = `
+            <div class="search-result-item-info">
+                <div class="search-result-item-name">
+                    <i class="fas ${fileIcon}"></i> ${highlightedName}
+                </div>
+                <div class="search-result-item-path">${highlightedPath}</div>
+            </div>
+            <div class="search-result-item-actions">
+                <button type="button" class="action-button" data-action="preview" title="Preview" data-path="${file.path}" data-filename="${file.name}">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button type="button" class="action-button" data-action="add" title="Add to selected files" data-path="${file.path}" data-filename="${file.name}">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        `;
+        
+        // Add click event to open preview when clicking on the file info
+        const fileInfo = resultItem.querySelector('.search-result-item-info');
+        fileInfo.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent any default actions
+            toggleFilePreview(file.path, file.name);
+        });
+        
+        // Add click event for the preview button
+        const previewButton = resultItem.querySelector('.action-button[data-action="preview"]');
+        previewButton.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent form submission
+            e.stopPropagation(); // Stop event from bubbling
+            toggleFilePreview(file.path, file.name);
+        });
+        
+        // Add click event for the add button
+        const addButton = resultItem.querySelector('.action-button[data-action="add"]');
+        addButton.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent form submission
+            e.stopPropagation(); // Stop event from bubbling
+            
+            // Check the corresponding checkbox in the file tree
+            const checkbox = document.getElementById(file.checkboxId);
+            if (checkbox) {
+                checkbox.checked = true;
+                updateSelectedFilesList();
+            } else {
+                addFileToContext(file.path, file.name);
+            }
+        });
+        
+        container.appendChild(resultItem);
+    });
+}
+
+/**
+ * Highlights matches of the query in the text.
+ * @param {string} text - The text to highlight matches in.
+ * @param {string} query - The query to match.
+ * @returns {string} HTML with highlighted matches.
+ */
+function highlightMatches(text, query) {
+    if (!query) return text;
+    
+    // For path searches containing slashes, we need to match each part
+    if (query.includes('/')) {
+        // Split the query and the text by slashes
+        const queryParts = query.toLowerCase().split('/').filter(part => part.trim());
+        
+        // If there are multiple parts, try to highlight each part separately
+        if (queryParts.length > 1) {
+            let result = text;
+            
+            // Highlight each query part in the text
+            queryParts.forEach(part => {
+                if (!part) return;
+                
+                // Escape special regex characters in the part
+                const escapedPart = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                
+                // Create a regex that's case insensitive
+                const regex = new RegExp(`(${escapedPart})`, 'gi');
+                
+                // Replace matches with highlighted spans
+                result = result.replace(regex, '<span class="search-highlight">$1</span>');
+            });
+            
+            return result;
+        }
+    }
+    
+    // For simple searches or if path handling didn't apply, use the standard approach
+    // Escape special regex characters in the query
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Create a regex that's case insensitive
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    
+    // Replace matches with highlighted spans
+    return text.replace(regex, '<span class="search-highlight">$1</span>');
 }

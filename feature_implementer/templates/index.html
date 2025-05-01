@@ -21,6 +21,17 @@
                 <i class="fas fa-sync-alt"></i>
             </button>
         </div>
+        
+        <!-- File search input -->
+        <div class="file-search-container">
+            <div class="search-input-wrapper">
+                <input type="text" id="file-search-input" placeholder="Search files..." class="search-input">
+                <button type="button" id="clear-search-button" class="clear-search-button" title="Clear search">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
         <div class="file-explorer">
             <div class="file-tree">
                 {% for dir_name, dir_content in file_tree.items() %}
@@ -32,6 +43,17 @@
                         <p class="error">{{ dir_content.error }}</p>
                     {% endif %}
                 {% endfor %}
+            </div>
+            
+            <!-- Search results container -->
+            <div class="search-results" id="search-results" style="display: none;">
+                <div class="search-results-header">
+                    <span id="search-result-count">0 results</span>
+                    <button type="button" class="action-button" id="close-search-button" title="Close search results">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                </div>
+                <div class="search-results-list" id="search-results-list"></div>
             </div>
         </div>
     </div>
