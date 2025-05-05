@@ -3,9 +3,9 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from config import Config
-from src.prompt_generator import generate_prompt
-from src.file_utils import save_prompt_to_file
+from .config import Config
+from .prompt_generator import generate_prompt
+from .file_utils import save_prompt_to_file
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -240,6 +240,58 @@ def main_cli() -> None:
         logger.error(f"Error generating prompt: {e}")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+
+
+def run_web_app():
+    """Entry point function to run the Flask web application."""
+    import os
+    import argparse
+    from .app import create_app
+
+    # Configure basic logging for the web app runner if not already configured
+    if not logging.getLogger().hasHandlers():
+        logging.basicConfig(level=logging.INFO)
+
+    logger = logging.getLogger(__name__ + ".run_web_app")
+
+    # --- Argument Parsing for Web App ---
+    parser = argparse.ArgumentParser(
+        description="Run the Feature Implementer web server."
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=os.environ.get("HOST", "127.0.0.1"),
+        help="Host address to bind the server to (default: 127.0.0.1, or HOST env var).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", 5000)),
+        help="Port number to run the server on (default: 5000, or PORT env var).",
+    )
+    parser.add_argument(
+        "--debug",
+        action=argparse.BooleanOptionalAction,  # Allows --debug / --no-debug
+        default=os.environ.get("FLASK_DEBUG", "True").lower() == "true",
+        help="Enable or disable Flask debug mode (default: enabled, or FLASK_DEBUG env var).",
+    )
+    args = parser.parse_args()
+    # --- End Argument Parsing ---
+
+    logger.info("Starting Flask development server...")
+
+    app = create_app()
+    # Use parsed arguments
+    debug_mode = args.debug
+    port = args.port
+    host = args.host
+
+    logger.info(f"Running on http://{host}:{port} (Debug mode: {debug_mode})")
+    try:
+        app.run(host=host, port=port, debug=debug_mode)
+    except Exception as e:
+        logger.error(f"Failed to start Flask server: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

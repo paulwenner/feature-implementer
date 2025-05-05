@@ -16,13 +16,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 import sqlite3
 
-from config import Config
-from src.file_utils import get_file_tree, read_file_content
-from src.prompt_generator import generate_prompt
+from .config import Config
+from .file_utils import get_file_tree, read_file_content
+from .prompt_generator import generate_prompt
 
 
 def create_app():
-    app = Flask(__name__, template_folder="../templates", static_folder="../static")
+    # When installed as a package, Flask automatically finds 'templates' and 'static'
+    # folders within the package if they are included as package_data.
+    app = Flask(__name__)
 
     app.secret_key = Config.SECRET_KEY
 

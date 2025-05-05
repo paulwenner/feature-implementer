@@ -2,8 +2,8 @@ from pathlib import Path
 import logging
 from typing import List, Union, Optional
 
-from config import Config
-from src.file_utils import read_file_content
+from .config import Config
+from .file_utils import read_file_content
 
 
 def gather_context(file_paths: List[Union[Path, str]]) -> str:

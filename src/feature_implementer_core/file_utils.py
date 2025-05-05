@@ -3,7 +3,7 @@ import time
 import logging
 from typing import Dict, Any, List, Union, Tuple, Optional
 
-from config import Config
+from .config import Config
 
 
 # Define a better caching structure with TTL and lock mechanism

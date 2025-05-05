@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "feature_implementer_core"
+version = "0.1.0"
+authors = [
+  { name="Paul Wenner", email="paul.wenner@example.com" }, # TODO: Verify email
+]
+description = "A tool to help implement features based on context."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License", # Choose your license
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # List your dependencies here, e.g., from requirements.txt
+    "Flask>=2.0", 
+    "Jinja2>=3.1",
+    "Werkzeug>=2.3",
+    "MarkupSafe>=2.1",
+    "itsdangerous>=2.1",
+    "click>=8.1",
+    "gunicorn>=21.2",
+    "tiktoken>=0.5",
+    # Add other dependencies
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/feature_implementer" # TODO: Update URL
+
+[project.scripts]
+# Optional: Define command-line scripts if needed
+feature-implementer = "feature_implementer_core.cli:run_web_app" # Flask app runner
+feature-implementer-cli = "feature_implementer_core.cli:main_cli" # Original CLI entry point
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Look for packages in the 'src' directory
+
+[tool.setuptools.package-data]
+"feature_implementer_core" = ["py.typed", "templates/**", "static/**", "feature_implementation_template.md"] 

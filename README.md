@@ -1,94 +1,89 @@
 # Feature Implementer
 
-A tool to generate feature implementation prompts for software development projects. This application helps create well-structured prompts for LLMs by gathering context from relevant code files.
+A pip-installable tool to generate feature implementation prompts for software development projects. This application helps create well-structured prompts for LLMs by gathering context from relevant code files within your project.
 
 ## Features
 
-- Browse and select files from your codebase for context
+- Browse and select files from a specified project directory for context
 - Create and manage custom prompt templates
 - Add Jira tickets and custom instructions
 - Generate a comprehensive prompt for LLM-assisted feature implementation
 - Export prompts to Markdown files
 - Light/dark mode support
 
-## Project Structure
+## Project Structure (Package)
 
 ```
-feature_implementer/
-├── README.md               # Project documentation
-├── LICENSE                 # Project License (MIT)
-├── requirements.txt        # Python dependencies
-├── config.py              # Configuration settings
-├── run.py                 # Application entry point
-├── feature_implementation_template.md # Default template for feature implementation prompts
-├── src/                   # Source code
-│   ├── __init__.py
-│   ├── app.py             # Flask application setup
-│   ├── cli.py             # Command Line Interface entry point
-│   ├── file_utils.py      # File management utilities
-│   ├── prompt_generator.py # Prompt generation logic
-├── static/                # Static assets
-│   ├── css/               # Stylesheets
-│   │   └── style.css      # Main stylesheet
-│   ├── js/                # JavaScript files
-│   │   ├── file_explorer.js # File explorer functionality
-│   │   ├── form_handler.js  # Form submission handling
-│   │   ├── modal_utils.js   # Modal dialog utilities
-│   │   ├── preset_handler.js # Preset management functionality
-│   │   ├── theme_toggle.js  # Theme switching
-│   │   └── ui_utils.js      # UI utility functions
-│   └── assets/            # Static assets like icons
-├── templates/             # HTML templates
-│   ├── base.html          # Base template with common elements
-│   ├── index.html         # Main page for prompt generation
-│   ├── macros.html        # Reusable template components
-│   ├── result.html        # Page to display generated prompt
-│   ├── template_manager.html # Template management page
-│   └── user_templates/    # Directory for user-created templates (if stored as files)
-├── outputs/               # Default directory for generated output files
-├── Dockerfile             # Docker configuration
-└── docker-compose.yml     # Docker Compose configuration (if used from parent directory)
+feature_implementer/              # Project Root
+├── README.md
+├── LICENSE
+├── pyproject.toml            # Build/package configuration
+├── .gitignore
+├── run.py                    # Example script to run the Flask app
+└── src/
+    └── feature_implementer_core/ # The actual Python package
+        ├── __init__.py
+        ├── app.py              # Flask application setup
+        ├── cli.py              # Command Line Interface logic
+        ├── config.py           # Configuration settings
+        ├── file_utils.py       # File management utilities
+        ├── prompt_generator.py # Prompt generation logic
+        ├── feature_implementation_template.md # Default template
+        ├── templates/          # HTML templates
+        │   ├── ...
+        ├── static/             # Static assets (CSS, JS)
+        │   ├── ...
+        └── feature_implementer.db # Default database location (relative to where app runs)
 ```
 
 ## Setup
 
-### Local Development
+1.  **(Optional) Create a virtual environment:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
 
-1. Create a virtual environment:
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2.  **Install the package:**
+    *   **From source (for development):** Navigate to the `feature_implementer` directory (where `pyproject.toml` is) and run:
+        ```bash
+        pip install -e .
+        ```
+    *   **From a built wheel (if you build it first):**
+        ```bash
+        # Build:
+        python -m build
+        # Install:
+        pip install dist/feature_implementer_core-*.whl
+        ```
 
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+3.  **Run the application:**
+    *   **Web UI:**
+        ```bash
+        feature-implementer # Or python run.py if feature-implementer script isn't in PATH
+        ```
+        If port 5000 is already in use, you can specify a different port using the PORT environment variable:
+        ```bash
+        PORT=5001 feature-implementer
+        ```
+        Alternatively, use the `--port` and `--host` command-line arguments:
+        ```bash
+        feature-implementer --port 5001 --host 0.0.0.0
+        # You can also disable debug mode if needed:
+        feature-implementer --no-debug
+        ```
+    *   **CLI:** Use the `feature-implementer-cli` command (see below).
 
-3. Run the application:
-   ```
-   python run.py
-   ```
-
-4. Access the application at http://localhost:5000
+4.  Access the web application (if running) typically at `http://127.0.0.1:5000` (or the host/port you specified).
 
 ### Docker Setup
 
-1. Build and run with Docker:
-   ```
-   docker build -t feature-implementer .
-   docker run -p 5000:5000 feature-implementer
-   ```
+**(Removed)** This project is now designed to be installed as a Python package via pip, not run directly via Docker.
 
-2. Or use docker-compose:
-   ```
-   docker-compose up
-   ```
+## Usage (Web UI)
 
-## Usage
-
-1. **Place your project code** into the `data/` directory within the `feature_implementer` folder. The file explorer in the web UI will display the contents of this directory. (The current content is just placeholder data).
-2. Navigate to the web interface (usually http://localhost:5000).
+1.  **Configure Scan Directory:** By default, the tool might scan the directory it's run from or require configuration. Check `config.py` or application startup logs for the directory being scanned. You may need to adjust `SCAN_DIRS` in `config.py` or provide it via environment variables/CLI arguments if implemented.
+2.  Navigate to the web interface.
 3. Select files from your codebase (shown in the file explorer) to provide context for the prompt.
 4. Enter Jira ticket description (if applicable).
 5. Add any additional implementation instructions.
@@ -109,26 +104,28 @@ The application allows you to create and manage custom prompt templates for diff
 
 ## CLI Usage
 
-The application also provides a command-line interface for generating prompts:
+The package provides command-line interfaces:
 
-```
-python -m src.cli --context-files path/to/file1.py path/to/file2.py --jira "Jira ticket details" --instructions "Implementation notes"
-```
+*   `feature-implementer [--host <address>] [--port <number>] [--debug | --no-debug]`: Runs the Flask web server.
+*   `feature-implementer-cli`: Accesses the core CLI functions for prompt generation and template management (see examples below).
 
-For template management via CLI:
+**Examples:**
 
-```
+```bash
+# Generate prompt using CLI
+feature-implementer-cli --context-files path/to/your/file1.py path/to/your/file2.py --jira "Jira details" --instructions "Notes"
+
 # List all templates
-python -m src.cli --list-templates
+feature-implementer-cli --list-templates
 
 # Create a new template
-python -m src.cli --create-template "My Template" --template-content path/to/template.md --template-description "Template description"
+feature-implementer-cli --create-template "My Template" --template-content path/to/template.md --template-description "Desc"
 
 # Set a template as default
-python -m src.cli --set-default TEMPLATE_ID
+feature-implementer-cli --set-default TEMPLATE_ID
 
 # Use a specific template
-python -m src.cli --template-id TEMPLATE_ID --context-files path/to/file.py
+feature-implementer-cli --template-id TEMPLATE_ID --context-files path/to/file.py
 ```
 
 ## License

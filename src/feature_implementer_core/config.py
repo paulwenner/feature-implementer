@@ -20,24 +20,25 @@ class Config:
             )
 
     # Path configuration
-    WORKSPACE_ROOT = Path("/app") if os.path.exists("/app") else Path.cwd().parent
+    WORKSPACE_ROOT = Path.cwd()
     MODULE_DIR = Path(__file__).parent
     DEFAULT_TEMPLATE = MODULE_DIR / "feature_implementation_template.md"
-    DEFAULT_OUTPUT_DIR = MODULE_DIR / "outputs"
+    DEFAULT_OUTPUT_DIR = Path.cwd() / "outputs"
     DEFAULT_OUTPUT_FILE = DEFAULT_OUTPUT_DIR / "implementation_prompt.md"
     TEMPLATES_DIR = MODULE_DIR / "templates" / "user_templates"
 
-    # Database configuration for persistent presets
-    DB_PATH = MODULE_DIR / "data" / "presets.db"
+    # Database configuration
+    DB_PATH = Path.cwd() / "feature_implementer.db"
 
-    # Ensure the data directory exists
-    (MODULE_DIR / "data").mkdir(exist_ok=True)
+    # Ensure the *parent* directory for the DB exists (usually CWD, so it should)
+    # DB_PATH.parent.mkdir(exist_ok=True, parents=True)
+    # (MODULE_DIR / "data").mkdir(exist_ok=True) # Don't create data dir in package
 
-    # Ensure the templates directory exists
-    TEMPLATES_DIR.mkdir(exist_ok=True, parents=True)
+    # Ensure the user templates directory exists (if file-based templates were used)
+    # TEMPLATES_DIR.mkdir(exist_ok=True, parents=True)
 
     # File explorer configuration
-    SCAN_DIRS = ["data"]
+    SCAN_DIRS = [str(Path.cwd())]
     IGNORE_PATTERNS = [
         ".git",
         ".vscode",
@@ -85,9 +86,11 @@ class Config:
     def _init_preset_db(cls):
         """Initialize the preset database schema"""
         try:
-            # Ensure the data directory exists
-            data_dir = cls.DB_PATH.parent
-            data_dir.mkdir(exist_ok=True)
+            # Ensure the parent directory for the DB exists
+            db_dir = cls.DB_PATH.parent
+            db_dir.mkdir(exist_ok=True, parents=True)
+            # data_dir = cls.DB_PATH.parent
+            # data_dir.mkdir(exist_ok=True)
 
             conn = sqlite3.connect(str(cls.DB_PATH))
             cursor = conn.cursor()
