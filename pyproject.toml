@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "feature-implementer"
-version = "0.1.0"
+version = "0.0.4"
 authors = [
-  { name="Paul Wenner", email="paul.wenner@crateflow.ai" },
+  { name = "Paul Wenner", email = "paul.wenner@crateflow.ai" },
 ]
-description = "A tool to help implement features based on context."
+description = "A tool to help implement features and create specific prompts."
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = [
@@ -20,29 +20,29 @@ keywords = [
   "context",
   "cli",
   "web",
-  "flask",
+  "feature-implement",
   "template",
 ]
 
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
+
 dependencies = [
-    "Flask>=2.0", 
-    "Jinja2>=3.1",
-    "Werkzeug>=2.3",
-    "MarkupSafe>=2.1",
-    "itsdangerous>=2.1",
-    "click>=8.1",
-    "gunicorn>=21.2",
-    "tiktoken>=0.5",
-    # Add other dependencies
+  "Jinja2>=3.1",
+  "Werkzeug>=2.3",
+  "MarkupSafe>=2.1",
+  "itsdangerous>=2.1",
+  "click>=8.1",
+  "Flask>=2.0",
+  "gunicorn>=20.1",
+  "tiktoken>=0.5",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/paulwenner/feature-implementer"
+Homepage = "https://github.com/paulwenner/feature-implementer"
 
 [project.scripts]
 feature-implementer = "feature_implementer_core.cli:run_web_app"
@@ -52,4 +52,4 @@ feature-implementer-cli = "feature_implementer_core.cli:main_cli"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"feature_implementer_core" = ["py.typed", "templates/**", "static/**", "feature_implementation_template.md"] 
+"feature_implementer_core" = ["py.typed", "templates/**", "static/**", "feature_implementation_template.md"]
