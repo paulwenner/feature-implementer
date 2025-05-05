@@ -4,128 +4,162 @@ A pip-installable tool to generate feature implementation prompts for software d
 
 ## Features
 
-- Browse and select files from a specified project directory for context
-- Create and manage custom prompt templates
-- Add Jira tickets and custom instructions
-- Generate a comprehensive prompt for LLM-assisted feature implementation
+- Browse and select files from your project directory for context
+- Create, manage, and use custom prompt templates stored in a local database
+- Add Jira ticket descriptions and custom instructions (either as text or file paths)
+- Generate comprehensive prompts for LLM-assisted feature implementation
 - Export prompts to Markdown files
-- Light/dark mode support
+- CLI for prompt generation and template management
+- Web UI (Flask) for interactive use
+- Light/dark mode support in Web UI
 
 ## Project Structure (Package)
 
 ```
-feature_implementer/              # Project Root
+feature-implementer/              # Project Root
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml            # Build/package configuration
 ├── .gitignore
-├── run.py                    # Example script to run the Flask app
+# Removed run.py as entry points are preferred
 └── src/
     └── feature_implementer_core/ # The actual Python package
         ├── __init__.py
         ├── app.py              # Flask application setup
         ├── cli.py              # Command Line Interface logic
         ├── config.py           # Configuration settings
+        ├── database.py         # Database interaction logic (SQLite)
         ├── file_utils.py       # File management utilities
         ├── prompt_generator.py # Prompt generation logic
-        ├── feature_implementation_template.md # Default template
-        ├── templates/          # HTML templates
-        │   ├── ...
+        ├── feature_implementation_template.md # Default template source
+        ├── templates/          # HTML templates for Flask app
+        │   ├── index.html
+        │   ├── template_manager.html
+        │   └── macros.html
+        │   └── ...
         ├── static/             # Static assets (CSS, JS)
-        │   ├── ...
+        │   ├── css/
+        │   ├── js/
+        │   └── ...
         └── feature_implementer.db # Default database location (relative to where app runs)
 ```
 
 ## Setup
 
-1.  **(Optional) Create a virtual environment:**
+1.  **(Recommended) Create and activate a virtual environment:**
     ```bash
     python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    # On Linux/macOS:
+    source venv/bin/activate
+    # On Windows:
+    # venv\Scripts\activate 
     ```
 
 2.  **Install the package:**
-    *   **From source (for development):** Navigate to the `feature_implementer` directory (where `pyproject.toml` is) and run:
+    The simplest way is to install directly from the source directory using pip. This handles all dependencies listed in `pyproject.toml`.
+    *   Navigate to the project root directory (where `pyproject.toml` is) and run:
         ```bash
         pip install -e .
         ```
-    *   **From a built wheel (if you build it first):**
+        *(The `-e` flag installs the package in "editable" mode, meaning changes to the source code are reflected immediately without needing to reinstall.)*
+
+    *   Alternatively, you can build the wheel first and then install it:
         ```bash
-        # Build:
+        # Build the sdist and wheel:
         python -m build
-        # Install:
-        pip install dist/feature_implementer_core-*.whl
+        # Install the built wheel (replace version number):
+        pip install dist/feature_implementer-0.1.0-py3-none-any.whl 
         ```
 
 3.  **Run the application:**
-    *   **Web UI:**
+    Once installed, the package provides two command-line scripts:
+    *   **Web UI:** Start the Flask server.
         ```bash
-        feature-implementer # Or python run.py if feature-implementer script isn't in PATH
+        feature-implementer 
         ```
-        If port 5000 is already in use, you can specify a different port using the PORT environment variable:
+        This typically runs on `http://127.0.0.1:5000`. You can customize the host and port:
         ```bash
-        PORT=5001 feature-implementer
-        ```
-        Alternatively, use the `--port` and `--host` command-line arguments:
-        ```bash
-        feature-implementer --port 5001 --host 0.0.0.0
-        # You can also disable debug mode if needed:
+        # Run on a different port
+        feature-implementer --port 5001
+        
+        # Run accessible on your network (use with caution)
+        feature-implementer --host 0.0.0.0 
+        
+        # Run in production mode using gunicorn (if installed)
+        feature-implementer --prod --workers 4
+        
+        # Disable debug mode (default is usually off unless FLASK_DEBUG=true)
         feature-implementer --no-debug
         ```
-    *   **CLI:** Use the `feature-implementer-cli` command (see below).
+    *   **CLI:** Use the `feature-implementer-cli` command for direct operations (see CLI Usage below).
 
-4.  Access the web application (if running) typically at `http://127.0.0.1:5000` (or the host/port you specified).
-
-### Docker Setup
-
-**(Removed)** This project is now designed to be installed as a Python package via pip, not run directly via Docker.
+4.  Access the web application (if running) via your browser at the specified host and port.
 
 ## Usage (Web UI)
 
-1.  **Configure Scan Directory:** By default, the tool might scan the directory it's run from or require configuration. Check `config.py` or application startup logs for the directory being scanned. You may need to adjust `SCAN_DIRS` in `config.py` or provide it via environment variables/CLI arguments if implemented.
-2.  Navigate to the web interface.
-3. Select files from your codebase (shown in the file explorer) to provide context for the prompt.
-4. Enter Jira ticket description (if applicable).
-5. Add any additional implementation instructions.
-6. Click "Generate Prompt".
-7. Copy or export the generated prompt for use with an LLM.
+1.  Start the web server using `feature-implementer`.
+2.  Navigate to the web interface in your browser.
+3.  The file explorer shows files relative to where the application was started (or configured `WORKSPACE_ROOT`).
+4.  Select files from your codebase to provide context for the prompt.
+5.  Enter the Jira ticket description (or a path to a file containing it).
+6.  Add any additional implementation instructions (or a path to a file containing them).
+7.  Select a prompt template from the dropdown (defaults to the configured default template).
+8.  Click "Generate Prompt".
+9.  Copy or export the generated prompt (as Markdown) for use with an LLM.
 
-## Template Management
+## Template Management (Web UI & CLI)
 
-The application allows you to create and manage custom prompt templates for different use cases:
+The application allows you to create and manage custom prompt templates stored in a local SQLite database (`feature_implementer.db`).
 
-1. Navigate to the Templates page
-2. Create a new template with placeholders:
-   - `{relevant_code_context}` - Selected code files
-   - `{jira_description}` - Jira ticket details
-   - `{additional_instructions}` - Any extra notes
-3. Set a template as default for all new prompts
-4. Templates are stored in a SQLite database for persistence
+**Web UI:**
+1.  Navigate to the "Template Manager" page (link usually in the header/footer).
+2.  View existing templates.
+3.  Create a new template using the form. Essential placeholders:
+    *   `{relevant_code_context}` - Gets replaced with the content of selected code files.
+    *   `{jira_description}` - Gets replaced with the Jira text/file content.
+    *   `{additional_instructions}` - Gets replaced with the instructions text/file content.
+4.  Set a template as the default using the "Set Default" button.
+5.  Edit or delete existing templates.
+6.  Reset all templates to the initial standard set using the "Reset" button (this deletes all custom templates).
+
+**CLI:** See CLI usage examples below for managing templates directly.
 
 ## CLI Usage
 
-The package provides command-line interfaces:
+The package provides two main commands after installation:
 
-*   `feature-implementer [--host <address>] [--port <number>] [--debug | --no-debug]`: Runs the Flask web server.
-*   `feature-implementer-cli`: Accesses the core CLI functions for prompt generation and template management (see examples below).
+*   `feature-implementer`: Runs the Flask web server (as described in Setup).
+*   `feature-implementer-cli`: Accesses core functions for prompt generation and template management.
 
-**Examples:**
+**`feature-implementer-cli` Examples:**
 
 ```bash
-# Generate prompt using CLI
-feature-implementer-cli --context-files path/to/your/file1.py path/to/your/file2.py --jira "Jira details" --instructions "Notes"
+# 1. Generate a prompt (requires context files and Jira description)
+feature-implementer-cli --context-files src/feature_implementer_core/app.py src/feature_implementer_core/cli.py --jira "FEAT-123: Implement new endpoint" --instructions "Use Pydantic for validation." --output my_prompt.md
 
-# List all templates
+# Use a specific template ID for generation
+feature-implementer-cli --template-id 2 --context-files ... --jira ... 
+
+# Read Jira description from a file
+feature-implementer-cli --context-files ... --jira path/to/description.txt
+
+# 2. Manage Templates
+
+# List all available templates
 feature-implementer-cli --list-templates
 
-# Create a new template
-feature-implementer-cli --create-template "My Template" --template-content path/to/template.md --template-description "Desc"
+# Create a new template from a content file
+feature-implementer-cli --create-template "My API Template" --template-content path/to/my_template.txt --template-description "Template for API endpoints"
 
-# Set a template as default
-feature-implementer-cli --set-default TEMPLATE_ID
+# Set template ID 3 as the default
+feature-implementer-cli --set-default 3
 
-# Use a specific template
-feature-implementer-cli --template-id TEMPLATE_ID --context-files path/to/file.py
+# Delete template ID 4
+feature-implementer-cli --delete-template 4
+
+# Reset all templates to the standard ones (prompts for confirmation)
+feature-implementer-cli --reset-templates
+
 ```
 
 ## License
