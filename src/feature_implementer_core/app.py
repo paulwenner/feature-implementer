@@ -28,6 +28,67 @@ from .file_utils import get_file_tree, read_file_content
 from .prompt_generator import generate_prompt
 
 
+def load_prompt_templates_from_dir():
+    """Load markdown files from the prompts directory and add them to the database."""
+    logger = logging.getLogger(__name__)
+    prompts_dir = Config.PROMPTS_DIR
+    db_path = get_app_db_path()
+
+    if not prompts_dir.exists():
+        logger.info(f"Prompts directory does not exist: {prompts_dir}")
+        return
+
+    logger.info(f"Loading prompt templates from directory: {prompts_dir}")
+
+    try:
+        # Get existing template names to avoid duplicates
+        existing_templates = database.get_templates(db_path)
+        existing_names = {template["name"] for template in existing_templates}
+
+        count = 0
+        for file_path in prompts_dir.glob("*.md"):
+            template_name = file_path.stem
+
+            # Skip if a template with this name already exists
+            if template_name in existing_names:
+                logger.debug(f"Template '{template_name}' already exists, skipping")
+                continue
+
+            try:
+                content = file_path.read_text()
+
+                # Skip empty files
+                if not content.strip():
+                    logger.warning(f"Empty template file: {file_path}, skipping")
+                    continue
+
+                # Add to database
+                success, result = database.add_template(
+                    db_path,
+                    name=f"{template_name} (File)",
+                    content=content,
+                    description=f"Loaded from file: {file_path.name}",
+                    is_default=False,
+                )
+
+                if success:
+                    count += 1
+                    existing_names.add(template_name)
+                    logger.info(
+                        f"Added template '{template_name}' from file {file_path.name}"
+                    )
+                else:
+                    logger.warning(f"Failed to add template from {file_path}: {result}")
+
+            except Exception as e:
+                logger.error(f"Error reading template file {file_path}: {e}")
+
+        logger.info(f"Added {count} templates from prompt files directory")
+
+    except Exception as e:
+        logger.error(f"Error loading templates from directory: {e}", exc_info=True)
+
+
 def create_app():
     # When installed as a package, Flask automatically finds 'templates' and 'static'
     # folders within the package if they are included as package_data.
@@ -60,6 +121,14 @@ def create_app():
         )
         # Optionally, you could re-raise or return None here to prevent app start
         # flash("Critical database initialization error. App may not function.", "error")
+
+    # Load additional prompt templates from the prompts directory
+    try:
+        load_prompt_templates_from_dir()
+    except Exception as e:
+        logger.error(
+            f"Error loading prompt templates from directory: {e}", exc_info=True
+        )
 
     # --- App startup tasks (moved from Config) ---
     # Pre-populate the file tree cache on startup
