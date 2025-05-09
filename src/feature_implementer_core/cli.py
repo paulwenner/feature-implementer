@@ -111,6 +111,12 @@ def parse_arguments() -> argparse.Namespace:
         default=None,  # Default handled later based on Config
         help=f"Path to save the generated prompt file. Defaults to ./outputs/implementation_prompt.md",
     )
+    parser.add_argument(
+        "--working-dir",
+        type=str,
+        default=None,
+        help=f"Path to use as the working directory instead of the current one. Files, database and outputs will be relative to this location.",
+    )
     return parser.parse_args()
 
 
@@ -251,22 +257,33 @@ def main_cli() -> None:
     )
     logger = logging.getLogger("feature_implementer_cli")
 
+    # Parse command-line arguments
     args = parse_arguments()
+
+    # Set up the working directory if specified
+    if args.working_dir:
+        logger.info(f"Using custom working directory: {args.working_dir}")
+        try:
+            Config.set_workspace_root(args.working_dir)
+        except ValueError as e:
+            logger.error(f"Working directory error: {e}")
+            sys.exit(1)
+
+    # Get the configured DB path (after working_dir is applied)
     db_path = get_app_db_path()
 
-    # --- Initialize Database ---
-    # Ensure DB exists and schema is up-to-date before any operation
+    # Ensure DB initialization with the correct path
     try:
-        initialize_app_database()
+        initialize_app_database()  # This initializes the DB at the configured path
     except Exception as e:
-        logger.error(
-            f"Database initialization failed: {e}. Cannot continue.", exc_info=True
-        )
+        logger.error(f"Failed to initialize database: {e}", exc_info=True)
         sys.exit(1)
 
-    # --- Handle Template Management Operations ---
-    if handle_template_operations(args, db_path, logger):
-        sys.exit(0)  # Exit successfully after performing a template operation
+    # --- Process Template Operations First (if any) ---
+    template_op = handle_template_operations(args, db_path, logger)
+    if template_op:
+        # Template operation performed, exit early
+        sys.exit(0)
 
     # --- Proceed with Prompt Generation ---
     logger.info("Generating prompt...")
@@ -397,8 +414,23 @@ def run_web_app():
         default=int(os.environ.get("WEB_CONCURRENCY", 4)),
         help="Number of Gunicorn workers (if --prod is used).",
     )
+    parser.add_argument(
+        "--working-dir",
+        type=str,
+        default=None,
+        help="Path to use as the working directory instead of the current one. Files, database, and outputs will be relative to this location.",
+    )
 
     args = parser.parse_args()
+
+    # Set up the working directory if specified
+    if args.working_dir:
+        logger.info(f"Using custom working directory: {args.working_dir}")
+        try:
+            Config.set_workspace_root(args.working_dir)
+        except ValueError as e:
+            logger.error(f"Working directory error: {e}")
+            sys.exit(1)
 
     # Create the Flask app instance
     # Database initialization happens inside create_app()

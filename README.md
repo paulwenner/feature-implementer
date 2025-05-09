@@ -90,6 +90,9 @@ feature-implementer/              # Project Root
         
         # Disable debug mode (default is usually off unless FLASK_DEBUG=true)
         feature-implementer --no-debug
+        
+        # Use a different working directory than the current one
+        feature-implementer --working-dir /path/to/project
         ```
     *   **CLI:** Use the `feature-implementer-cli` command for direct operations (see CLI Usage below).
 
@@ -142,6 +145,9 @@ feature-implementer-cli --template-id 2 --context-files ... --jira ...
 
 # Read Jira description from a file
 feature-implementer-cli --context-files ... --jira path/to/description.txt
+
+# Use a different working directory for file operations
+feature-implementer-cli --working-dir /path/to/project --context-files app.py models.py --jira "FEAT-456: Add new feature"
 
 # 2. Manage Templates
 

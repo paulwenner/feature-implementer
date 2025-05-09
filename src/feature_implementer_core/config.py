@@ -36,6 +36,7 @@ class Config:
             )
 
     # --- Path Configuration ---
+    # Default workspace root is the current working directory
     WORKSPACE_ROOT = Path.cwd().resolve()  # Use resolved absolute path
     MODULE_DIR = Path(__file__).parent.resolve()
     DEFAULT_TEMPLATE_FILE = MODULE_DIR / "feature_implementation_template.md"
@@ -119,6 +120,58 @@ Error loading default template. Please check configuration.
 
 ## Task
 Implement the feature."""
+
+    @classmethod
+    def set_workspace_root(cls, workspace_path: str):
+        """Update workspace root and related paths based on a new directory"""
+        if not workspace_path:
+            logger.warning("Empty workspace path provided, using current directory")
+            return
+
+        try:
+            # Convert to absolute path and resolve
+            workspace = Path(workspace_path).resolve()
+
+            if not workspace.is_dir():
+                logger.error(
+                    f"Working directory does not exist or is not a directory: {workspace}"
+                )
+                raise ValueError(f"Invalid working directory: {workspace}")
+
+            # Update workspace root
+            cls.WORKSPACE_ROOT = workspace
+            logger.info(f"Workspace root set to: {cls.WORKSPACE_ROOT}")
+
+            # Update dependent paths
+            cls.DEFAULT_OUTPUT_DIR = cls.WORKSPACE_ROOT / "outputs"
+            cls.DEFAULT_OUTPUT_FILE = (
+                cls.DEFAULT_OUTPUT_DIR / "implementation_prompt.md"
+            )
+            cls.DB_PATH = cls.WORKSPACE_ROOT / "feature_implementer.db"
+
+            # Update scan directories
+            cls.SCAN_DIRS = [str(cls.WORKSPACE_ROOT)]
+
+            # Update ignore patterns (which might include relative paths)
+            if cls.DEFAULT_OUTPUT_DIR.is_relative_to(cls.WORKSPACE_ROOT):
+                output_pattern = (
+                    str(cls.DEFAULT_OUTPUT_DIR.relative_to(cls.WORKSPACE_ROOT))
+                    + os.sep
+                    + "*"
+                )
+            else:
+                output_pattern = "outputs" + os.sep + "*"
+
+            # Update the ignore patterns
+            cls.IGNORE_PATTERNS = [
+                p for p in cls.IGNORE_PATTERNS if not p.startswith("outputs" + os.sep)
+            ] + [output_pattern]
+
+        except Exception as e:
+            logger.error(
+                f"Error setting workspace root to {workspace_path}: {e}", exc_info=True
+            )
+            raise
 
     # NOTE: All database interaction methods (get_presets, _init_preset_db,
     #       add_preset, delete_preset, get_templates, get_default_template_id,
