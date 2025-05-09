@@ -77,7 +77,7 @@ feature-implementer/              # Project Root
         ```bash
         feature-implementer 
         ```
-        This typically runs on `http://127.0.0.1:5000`. You can customize the host and port:
+        This typically runs on `http://127.0.0.1:4605`. You can customize the host and port:
         ```bash
         # Run on a different port
         feature-implementer --port 5001

@@ -259,10 +259,6 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/templates/${templateId}`)
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                    return;
-                }
                 
                 const template = data.template;
                 templateIdField.value = template.id;
@@ -274,19 +270,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('template-modal-title').textContent = 'Edit Template';
                 showModal('template-modal');
             })
-            .catch(error => {
-                showToast(`Error loading template: ${error}`, 'error');
-            });
     }
     
     function previewTemplate(templateId) {
         fetch(`/templates/${templateId}`)
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    showToast(data.error, 'error');
-                    return;
-                }
                 
                 const template = data.template;
                 document.getElementById('preview-template-name').textContent = template.name;
@@ -294,9 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 showModal('preview-modal');
             })
-            .catch(error => {
-                showToast(`Error loading template preview: ${error}`, 'error');
-            });
     }
     
     function saveTemplate() {
@@ -359,8 +345,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Success
             closeModal('template-modal');
-            showToast(data.message, 'success');
-            
             // Reload the page to show updated templates
             window.location.reload();
         })
@@ -393,20 +377,14 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             closeModal('confirm-modal');
+
             
-            if (data.error) {
-                showToast(data.error, 'error');
-                return;
-            }
-            
-            showToast(data.message, 'success');
             
             // Reload the page to update the template list
             window.location.reload();
         })
         .catch(error => {
             closeModal('confirm-modal');
-            showToast(`Error deleting template: ${error}`, 'error');
         });
     }
     
@@ -416,19 +394,11 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.error) {
-                showToast(data.error, 'error');
-                return;
-            }
             
-            showToast(data.message, 'success');
             
             // Reload the page to update the UI
             window.location.reload();
         })
-        .catch(error => {
-            showToast(`Error setting default template: ${error}`, 'error');
-        });
     }
     
     function showResetConfirmation() {
@@ -450,20 +420,13 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             closeModal('confirm-modal');
-            
-            if (data.error) {
-                showToast(data.error, 'error');
-                return;
-            }
-            
-            showToast(data.message, 'success');
+     
             
             // Reload the page to update the template list
             window.location.reload();
         })
         .catch(error => {
             closeModal('confirm-modal');
-            showToast(`Error resetting templates: ${error}`, 'error');
         });
     }
     
@@ -505,9 +468,6 @@ Based on all the information provided above, please implement the required featu
         
         // Set the content in the textarea
         templateContentField.value = standardTemplate;
-        
-        // Show confirmation toast
-        showToast('Standard template applied', 'success');
     }
     
     function showFormError(message) {

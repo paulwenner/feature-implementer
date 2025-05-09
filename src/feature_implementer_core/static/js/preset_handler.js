@@ -37,8 +37,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Initialize preset selector with checkboxes and counter
-    initPresetSelector();
+    // Refresh presets from server on page load
+    console.log("Refreshing presets on page load");
+    refreshPresets().then(() => {
+        console.log("Initial preset refresh complete");
+        // Initialize preset selector with checkboxes and counter
+        initPresetSelector();
+    }).catch(() => {
+        console.log("Initial preset refresh failed, initializing with existing data");
+        // Initialize anyway even if refresh fails
+        initPresetSelector();
+    });
     
     /**
      * Shows the add preset modal with currently selected files
@@ -180,8 +189,16 @@ function savePreset() {
             errorEl.textContent = data.error;
             errorEl.style.display = 'block';
         } else {
+            // Format the presets to match our expected structure
+            const formattedPresets = {};
+            if (data.presets) {
+                for (const [name, files] of Object.entries(data.presets)) {
+                    formattedPresets[name] = { files: files };
+                }
+            }
+            
             // Success - refresh presets
-            updatePresets(data.presets);
+            updatePresets(formattedPresets);
             closeAddPresetModal();
         }
     })
@@ -217,32 +234,238 @@ function updatePresetSelectionCounter() {
 }
 
 /**
+ * Refreshes the presets data from the server
+ * @returns {Promise} Promise that resolves when presets are refreshed
+ */
+function refreshPresets() {
+    console.log("Refreshing presets from server");
+    return fetch('/presets', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            console.error("Error refreshing presets:", data.error);
+        } else {
+            // Format the presets to match our expected structure
+            const formattedPresets = {};
+            if (data.presets) {
+                for (const [name, files] of Object.entries(data.presets)) {
+                    formattedPresets[name] = { files: files };
+                }
+            }
+            
+            // Update presets in UI and global variable
+            window.presets = formattedPresets;
+            updatePresets(formattedPresets);
+            console.log("Presets refreshed successfully");
+        }
+        return data;
+    })
+    .catch(error => {
+        console.error("Error refreshing presets:", error);
+        throw error;
+    });
+}
+
+/**
  * Handles multiple preset selections from checkboxes
  * @param {string} presetName - The name of the selected/deselected preset
  * @param {boolean} isChecked - Whether the preset was checked or unchecked
  */
 function handleMultiplePresetSelection(presetName, isChecked) {
-    const preset = window.presets[presetName];
-    if (!preset || !preset.files || !Array.isArray(preset.files)) {
-        console.warn('Invalid preset:', presetName);
+    console.log("Selected preset:", presetName);
+    console.log("Preset data:", window.presets[presetName]);
+    
+    // If preset data is missing or corrupt, refresh from server first
+    if (!window.presets[presetName] || typeof window.presets[presetName] !== 'object') {
+        console.warn('Preset data missing or invalid, refreshing from server...');
+        refreshPresets().then(() => {
+            // Try again after refresh
+            handleMultiplePresetSelection(presetName, isChecked);
+        });
         return;
     }
     
+    const preset = window.presets[presetName];
+    if (!preset) {
+        console.warn('Preset not found:', presetName);
+        return;
+    }
+    
+    // Get all currently selected presets
+    const selectedPresets = document.querySelectorAll('input[name="presets"]:checked');
+    
     if (isChecked) {
-        // Add all files from this preset
-        preset.files.forEach(filePath => {
-            const checkbox = document.querySelector(`input[value="${filePath}"]`);
-            if (checkbox) {
+        // Get the files array from the preset
+        // Handle both formats: {files: [...]} and {files: {0: "file1", 1: "file2"}}
+        let presetFiles = preset.files || [];
+        
+        // Check if preset.files is an object but not an array
+        if (preset.files && typeof preset.files === 'object' && !Array.isArray(preset.files)) {
+            // Convert object to array
+            presetFiles = Object.values(preset.files);
+        }
+        
+        // Ensure we have an array to work with
+        if (!Array.isArray(presetFiles)) {
+            console.warn('Invalid preset files format:', presetName, presetFiles);
+            return;
+        }
+        
+        // Ensure all values in the array are strings
+        presetFiles = presetFiles.map(file => String(file));
+        
+        // Get all file checkboxes
+        const allFileCheckboxes = document.querySelectorAll('input[name="context_files"]');
+        
+        // If this is the first preset being selected, clear all current selections first
+        if (selectedPresets.length === 1 && selectedPresets[0].value === presetName) {
+            console.log("First preset selected, clearing all current selections");
+            clearSelectedFiles();
+            
+            // Also clear all visual highlights
+            document.querySelectorAll('.file-label.preset-file').forEach(label => {
+                label.classList.remove('preset-file');
+            });
+        }
+        
+        // First, determine which files are in the preset
+        const presetFilePaths = new Set(presetFiles);
+        
+        // For each checkbox, check it if it's in the preset
+        allFileCheckboxes.forEach(checkbox => {
+            const filePath = checkbox.value;
+            
+            // Check if any preset path matches this checkbox
+            // First try exact match
+            const exactMatch = presetFilePaths.has(filePath);
+            
+            // Then try basename match for absolute paths
+            const isAbsolutePathMatch = Array.from(presetFilePaths).some(presetPath => {
+                // If preset path is absolute and ends with the file path
+                if (presetPath.startsWith('/') && filePath.includes('/')) {
+                    const checkboxBasename = filePath.split('/').pop();
+                    const presetBasename = presetPath.split('/').pop();
+                    return checkboxBasename === presetBasename && 
+                           (presetPath.endsWith(filePath) || filePath.endsWith(presetPath));
+                }
+                return false;
+            });
+            
+            // If file is in preset, check it
+            if (exactMatch || isAbsolutePathMatch) {
                 checkbox.checked = true;
+                
+                // Also visually highlight the file in the explorer
+                const fileLabel = checkbox.closest('label');
+                if (fileLabel) {
+                    fileLabel.classList.add('preset-file');
+                }
+            }
+        });
+        
+        // Update the UI to reflect the selected files
+        updateSelectedFilesList();
+        updatePresetSelectionCounter();
+    } else {
+        // When unchecking a preset, we need to determine which files to uncheck
+        // First collect all files from all selected presets
+        const allSelectedPresetFiles = new Set();
+        
+        // Build a set of all files from selected presets (excluding the one being unchecked)
+        selectedPresets.forEach(presetCheckbox => {
+            if (presetCheckbox.value !== presetName) {
+                const selectedPresetData = window.presets[presetCheckbox.value];
+                if (selectedPresetData && selectedPresetData.files) {
+                    let files = selectedPresetData.files;
+                    if (typeof files === 'object' && !Array.isArray(files)) {
+                        files = Object.values(files);
+                    }
+                    if (Array.isArray(files)) {
+                        files.forEach(file => allSelectedPresetFiles.add(String(file)));
+                    }
+                }
+            }
+        });
+        
+        // Get the files array from the preset being unchecked
+        let presetFiles = preset.files || [];
+        
+        // Check if preset.files is an object but not an array
+        if (preset.files && typeof preset.files === 'object' && !Array.isArray(preset.files)) {
+            // Convert object to array
+            presetFiles = Object.values(preset.files);
+        }
+        
+        // Ensure we have an array to work with
+        if (!Array.isArray(presetFiles)) {
+            console.warn('Invalid preset files format:', presetName, presetFiles);
+            return;
+        }
+        
+        // Ensure all values in the array are strings
+        presetFiles = presetFiles.map(file => String(file));
+        
+        // Get all file checkboxes
+        const allFileCheckboxes = document.querySelectorAll('input[name="context_files"]');
+        
+        // For each checkbox, determine whether to keep it checked
+        allFileCheckboxes.forEach(checkbox => {
+            const filePath = checkbox.value;
+            
+            // If this file was part of the unchecked preset
+            const wasInUncheckedPreset = presetFiles.some(presetPath => {
+                if (presetPath === filePath) return true;
+                
+                // Check for basename match
+                if (presetPath.startsWith('/') && filePath.includes('/')) {
+                    const checkboxBasename = filePath.split('/').pop();
+                    const presetBasename = presetPath.split('/').pop();
+                    return checkboxBasename === presetBasename && 
+                          (presetPath.endsWith(filePath) || filePath.endsWith(presetPath));
+                }
+                return false;
+            });
+            
+            // If file was in unchecked preset AND not in any other selected preset, uncheck it
+            if (wasInUncheckedPreset) {
+                // Check if file is in any other selected preset
+                const isInOtherPreset = Array.from(allSelectedPresetFiles).some(selectedPath => {
+                    if (selectedPath === filePath) return true;
+                    
+                    // Check for basename match
+                    if (selectedPath.startsWith('/') && filePath.includes('/')) {
+                        const checkboxBasename = filePath.split('/').pop();
+                        const selectedBasename = selectedPath.split('/').pop();
+                        return checkboxBasename === selectedBasename && 
+                              (selectedPath.endsWith(filePath) || filePath.endsWith(selectedPath));
+                    }
+                    return false;
+                });
+                
+                if (!isInOtherPreset) {
+                    checkbox.checked = false;
+                    
+                    // Remove visual highlight
+                    const fileLabel = checkbox.closest('label');
+                    if (fileLabel) {
+                        fileLabel.classList.remove('preset-file');
+                    }
+                }
             }
         });
         
         // Update the UI
         updateSelectedFilesList();
-        updatePresetSelectionCounter();
-    } else {
-        // We don't remove files when unchecking a preset
-        // Just update the counter
         updatePresetSelectionCounter();
     }
 }
@@ -254,6 +477,11 @@ function clearAllPresets() {
     // Uncheck all preset checkboxes
     document.querySelectorAll('input[name="presets"]').forEach(checkbox => {
         checkbox.checked = false;
+    });
+    
+    // Remove visual highlighting from all file labels
+    document.querySelectorAll('.file-label.preset-file').forEach(label => {
+        label.classList.remove('preset-file');
     });
     
     // Clear all selected files
@@ -271,23 +499,80 @@ function handlePresetSelection(presetName) {
     if (!presetName) {
         // "None" selected - clear selections
         clearSelectedFiles();
+        
+        // Remove all visual highlighting
+        document.querySelectorAll('.file-label.preset-file').forEach(label => {
+            label.classList.remove('preset-file');
+        });
+        
         return;
     }
     
+    console.log("Selected preset (radio):", presetName);
+    console.log("Preset data:", window.presets[presetName]);
+    
     const preset = window.presets[presetName];
-    if (!preset || !preset.files || !Array.isArray(preset.files)) {
-        console.warn('Invalid preset:', presetName);
+    if (!preset) {
+        console.warn('Preset not found:', presetName);
         return;
     }
+    
+    // Get the files array from the preset
+    // Handle both formats: {files: [...]} and {files: {0: "file1", 1: "file2"}}
+    let presetFiles = preset.files || [];
+    
+    // Check if preset.files is an object but not an array
+    if (preset.files && typeof preset.files === 'object' && !Array.isArray(preset.files)) {
+        // Convert object to array
+        presetFiles = Object.values(preset.files);
+    }
+    
+    // Ensure we have an array to work with
+    if (!Array.isArray(presetFiles)) {
+        console.warn('Invalid preset files format:', presetName, presetFiles);
+        return;
+    }
+    
+    // Ensure all values in the array are strings
+    presetFiles = presetFiles.map(file => String(file));
     
     // Clear existing selections
     clearSelectedFiles();
     
+    // Remove all visual highlighting first
+    document.querySelectorAll('.file-label.preset-file').forEach(label => {
+        label.classList.remove('preset-file');
+    });
+    
     // Select all files from the preset
-    preset.files.forEach(filePath => {
-        const checkbox = document.querySelector(`input[value="${filePath}"]`);
-        if (checkbox) {
+    const allFileCheckboxes = document.querySelectorAll('input[name="context_files"]');
+    
+    allFileCheckboxes.forEach(checkbox => {
+        const filePath = checkbox.value;
+        
+        // Check for exact match
+        const exactMatch = presetFiles.includes(filePath);
+        
+        // Check for basename match with absolute paths
+        const isAbsolutePathMatch = presetFiles.some(presetPath => {
+            // If preset path is absolute and ends with the file path
+            if (presetPath.startsWith('/') && filePath.includes('/')) {
+                const checkboxBasename = filePath.split('/').pop();
+                const presetBasename = presetPath.split('/').pop();
+                return checkboxBasename === presetBasename && 
+                      (presetPath.endsWith(filePath) || filePath.endsWith(presetPath));
+            }
+            return false;
+        });
+        
+        if (exactMatch || isAbsolutePathMatch) {
             checkbox.checked = true;
+            
+            // Add visual highlight
+            const fileLabel = checkbox.closest('label');
+            if (fileLabel) {
+                fileLabel.classList.add('preset-file');
+            }
         }
     });
     
@@ -304,8 +589,6 @@ function deletePreset(presetName) {
         return;
     }
     
-    // Show notification that deletion is in progress
-    showToast(`Deleting preset "${presetName}"...`, 'info');
     
     fetch(`/presets/${encodeURIComponent(presetName)}`, {
         method: 'DELETE',
@@ -322,13 +605,19 @@ function deletePreset(presetName) {
     })
     .then(data => {
         if (data.error) {
-            showToast(`Error: ${data.error}`, 'error');
             console.error("Preset deletion error:", data.error);
         } else {
+            // Format the presets to match our expected structure
+            const formattedPresets = {};
+            if (data.presets) {
+                for (const [name, files] of Object.entries(data.presets)) {
+                    formattedPresets[name] = { files: files };
+                }
+            }
+            
             // Update presets in UI and global variable
-            window.presets = data.presets;
-            updatePresets(data.presets);
-            showToast(`Preset "${presetName}" deleted successfully`, 'success');
+            window.presets = formattedPresets;
+            updatePresets(formattedPresets);
             
             // If preset radio buttons exist, select "None"
             const noneOption = document.querySelector('input[name="preset"][value=""]');
@@ -339,7 +628,6 @@ function deletePreset(presetName) {
     })
     .catch(error => {
         console.error("Error deleting preset:", error);
-        showToast(`Error deleting preset: ${error.message}`, 'error');
     });
 }
 
@@ -449,8 +737,136 @@ function initPresetSelector() {
     updatePresetSelectionCounter();
 }
 
+/**
+ * Checks if the currently selected files match any preset and updates
+ * preset checkboxes accordingly
+ */
+function updatePresetCheckboxes() {
+    // Get all selected files
+    const selectedFiles = getSelectedFiles();
+    const selectedFilePaths = new Set(selectedFiles.map(file => file.path));
+    
+    // Get all preset checkboxes
+    const presetCheckboxes = document.querySelectorAll('input[name="presets"]:checked');
+    
+    // For each checked preset, verify if all its files are still selected
+    presetCheckboxes.forEach(checkbox => {
+        const presetName = checkbox.value;
+        const preset = window.presets[presetName];
+        
+        if (!preset || !preset.files) return;
+        
+        // Get the files array from the preset
+        let presetFiles = preset.files;
+        if (typeof presetFiles === 'object' && !Array.isArray(presetFiles)) {
+            presetFiles = Object.values(presetFiles);
+        }
+        
+        // Check if any file from this preset was removed
+        const anyFileRemoved = presetFiles.some(presetFile => {
+            // Convert to string if needed
+            presetFile = String(presetFile);
+            
+            // Check if this file is not in the selected files
+            // First try exact match
+            if (selectedFilePaths.has(presetFile)) {
+                return false;
+            }
+            
+            // Then try basename match for absolute paths
+            const fileBasename = presetFile.split('/').pop();
+            const matchedByBasename = Array.from(selectedFilePaths).some(selectedPath => {
+                const selectedBasename = selectedPath.split('/').pop();
+                return fileBasename === selectedBasename &&
+                      (presetFile.endsWith(selectedPath) || selectedPath.endsWith(presetFile));
+            });
+            
+            return !matchedByBasename;
+        });
+        
+        // If any file was removed, uncheck this preset
+        if (anyFileRemoved) {
+            console.log(`Files from preset "${presetName}" were removed, unchecking preset`);
+            checkbox.checked = false;
+            
+            // Remove visual highlighting from files that are no longer in any selected preset
+            updateFileHighlighting();
+        }
+    });
+    
+    // Update counter
+    updatePresetSelectionCounter();
+}
+
+/**
+ * Updates visual highlighting for files based on selected presets
+ */
+function updateFileHighlighting() {
+    // First, remove all preset highlighting
+    document.querySelectorAll('.file-label.preset-file').forEach(label => {
+        label.classList.remove('preset-file');
+    });
+    
+    // Get all selected presets
+    const selectedPresets = document.querySelectorAll('input[name="presets"]:checked');
+    if (selectedPresets.length === 0) return;
+    
+    // Get all files from selected presets
+    const presetFiles = new Set();
+    selectedPresets.forEach(checkbox => {
+        const preset = window.presets[checkbox.value];
+        if (!preset || !preset.files) return;
+        
+        let files = preset.files;
+        if (typeof files === 'object' && !Array.isArray(files)) {
+            files = Object.values(files);
+        }
+        
+        if (Array.isArray(files)) {
+            files.forEach(file => presetFiles.add(String(file)));
+        }
+    });
+    
+    // Highlight all files that are in selected presets
+    const allFileCheckboxes = document.querySelectorAll('input[name="context_files"]');
+    allFileCheckboxes.forEach(checkbox => {
+        if (!checkbox.checked) return;
+        
+        const filePath = checkbox.value;
+        
+        // Check if this file is in any selected preset
+        const exactMatch = presetFiles.has(filePath);
+        
+        // Check for basename match
+        const isInPreset = exactMatch || Array.from(presetFiles).some(presetPath => {
+            if (presetPath.startsWith('/') && filePath.includes('/')) {
+                const checkboxBasename = filePath.split('/').pop();
+                const presetBasename = presetPath.split('/').pop();
+                return checkboxBasename === presetBasename && 
+                      (presetPath.endsWith(filePath) || filePath.endsWith(presetPath));
+            }
+            return false;
+        });
+        
+        // If this file is in a selected preset, highlight it
+        if (isInPreset) {
+            const fileLabel = checkbox.closest('label');
+            if (fileLabel) {
+                fileLabel.classList.add('preset-file');
+            }
+        }
+    });
+}
+
 // Make functions globally available
 window.handleMultiplePresetSelection = handleMultiplePresetSelection;
 window.clearAllPresets = clearAllPresets;
 window.initPresetSelector = initPresetSelector;
-window.testJsonEndpoint = testJsonEndpoint; 
+window.testJsonEndpoint = testJsonEndpoint;
+window.refreshPresets = refreshPresets;
+window.updatePresetCheckboxes = updatePresetCheckboxes;
+
+// Ensure presets object exists
+if (!window.presets) {
+    window.presets = {};
+}

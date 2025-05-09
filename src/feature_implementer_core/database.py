@@ -291,7 +291,12 @@ def add_preset(db_path: Path, name: str, files: List[str]) -> bool:
     """Add or update a preset with the given name and file list."""
     logger.info(f"Adding/updating preset: name={name}")
     try:
-        files_json = json.dumps(files)
+        # Ensure we have valid file paths
+        sanitized_files = [str(path).replace("\\", "/") for path in files if path]
+
+        # Use ensure_ascii=False to properly handle UTF-8 characters
+        files_json = json.dumps(sanitized_files, ensure_ascii=False)
+
         with get_db_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -319,7 +324,19 @@ def get_presets(db_path: Path) -> Dict[str, List[str]]:
             cursor.execute("SELECT name, files FROM presets ORDER BY name")
             for row in cursor.fetchall():
                 try:
-                    files_list = json.loads(row["files"])
+                    # Get the raw JSON string
+                    file_json_str = row["files"]
+
+                    # Validate it's valid JSON before attempting to parse
+                    if not file_json_str or not file_json_str.strip().startswith("["):
+                        logger.warning(
+                            f"Invalid JSON format for preset '{row['name']}': {file_json_str}"
+                        )
+                        continue
+
+                    # Parse the JSON
+                    files_list = json.loads(file_json_str)
+
                     # Ensure it's a list of strings
                     if isinstance(files_list, list) and all(
                         isinstance(f, str) for f in files_list
@@ -329,9 +346,9 @@ def get_presets(db_path: Path) -> Dict[str, List[str]]:
                         logger.warning(
                             f"Invalid format for files in preset '{row['name']}'. Skipping."
                         )
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
                     logger.warning(
-                        f"Could not decode files JSON for preset '{row['name']}'. Skipping."
+                        f"Could not decode files JSON for preset '{row['name']}': {e}"
                     )
             logger.debug(f"Found {len(presets)} valid presets")
             return presets

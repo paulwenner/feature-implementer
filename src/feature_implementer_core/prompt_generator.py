@@ -57,6 +57,52 @@ def gather_context(file_paths: List[Union[Path, str]]) -> str:
     return "\n".join(context)
 
 
+def remove_section(template: str, placeholder_name: str) -> str:
+    """Removes a markdown section containing a placeholder if the placeholder has no content.
+
+    This function precisely targets Markdown sections that contain the specified
+    placeholder within triple-backtick code blocks. It's designed to completely
+    remove optional sections from the generated prompt when they have no content.
+
+    Args:
+        template: The template content string
+        placeholder_name: The name of the placeholder to remove (without braces)
+
+    Returns:
+        Template with the specified section removed if the placeholder was found
+    """
+    import re
+
+    # Define specific patterns for each section type with lookahead to match
+    # everything up to the next section header or end of string
+    if placeholder_name == "jira_description":
+        pattern = re.compile(
+            r"## JIRA DESCRIPTION \(Optional\)\n\n```\n\{jira_description\}\n```\n\n(?=## |$)",
+            re.DOTALL,
+        )
+    elif placeholder_name == "additional_instructions":
+        pattern = re.compile(
+            r"## ADDITIONAL INSTRUCTIONS \(Optional\)\n\n```\n\{additional_instructions\}\n```\n\n(?=## |$)",
+            re.DOTALL,
+        )
+    elif placeholder_name == "relevant_code_context":
+        pattern = re.compile(
+            r"## RELEVANT CODE CONTEXT\n\n```\n\{relevant_code_context\}\n```\n\n(?=## |$)",
+            re.DOTALL,
+        )
+    else:
+        # If placeholder name doesn't match a known section, return unchanged
+        return template
+
+    # Remove the section entirely
+    result = re.sub(pattern, "", template)
+
+    # Cleanup: ensure we don't have excessive newlines (more than 2 consecutive)
+    result = re.sub(r"\n{3,}", "\n\n", result)
+
+    return result
+
+
 def generate_prompt(
     db_path: Path,  # Database path is now required
     template_id: int,  # Template ID is now required
@@ -97,8 +143,7 @@ def generate_prompt(
     )
 
     # --- Process Jira Description ---
-    # Check if it's a path to an existing file
-    jira_description_final = "N/A"
+    jira_description_final = ""
     if jira_description:
         try:
             jira_path = Path(jira_description)
@@ -109,9 +154,6 @@ def generate_prompt(
                     jira_description_final = jira_content
                 else:
                     logger.warning(f"Could not read Jira description file: {jira_path}")
-                    jira_description_final = (
-                        f"N/A (Error reading file: {jira_path.name})"
-                    )
             else:
                 # Not a file path, use the string directly
                 jira_description_final = jira_description
@@ -123,8 +165,7 @@ def generate_prompt(
             jira_description_final = jira_description  # Fallback to using as string
 
     # --- Process Additional Instructions ---
-    # Check if it's a path to an existing file
-    additional_instructions_final = "N/A"
+    additional_instructions_final = ""
     if additional_instructions:
         try:
             instr_path = Path(additional_instructions)
@@ -135,9 +176,6 @@ def generate_prompt(
                     additional_instructions_final = instr_content
                 else:
                     logger.warning(f"Could not read instructions file: {instr_path}")
-                    additional_instructions_final = (
-                        f"N/A (Error reading file: {instr_path.name})"
-                    )
             else:
                 # Not a file path, use the string directly
                 additional_instructions_final = additional_instructions
@@ -154,20 +192,42 @@ def generate_prompt(
 
     # --- Format Final Prompt ---
     try:
-        # Use placeholders, provide "N/A" only if the processed string is empty
-        final_prompt = template_content_final.format(
-            relevant_code_context=(
-                relevant_code_context if relevant_code_context else "N/A"
-            ),
-            jira_description=(
-                jira_description_final if jira_description_final else "N/A"
-            ),
-            additional_instructions=(
-                additional_instructions_final
-                if additional_instructions_final
-                else "N/A"
-            ),
+        final_prompt = template_content_final
+
+        # Check if sections should be included or removed
+        has_context = bool(relevant_code_context and relevant_code_context.strip())
+        has_jira = bool(jira_description_final and jira_description_final.strip())
+        has_instructions = bool(
+            additional_instructions_final and additional_instructions_final.strip()
         )
+
+        logger.debug(
+            f"Has context: {has_context}, Has JIRA: {has_jira}, Has instructions: {has_instructions}"
+        )
+
+        # First handle placeholder replacements for non-empty sections
+        if has_context:
+            final_prompt = final_prompt.replace(
+                "{relevant_code_context}", relevant_code_context
+            )
+        if has_jira:
+            final_prompt = final_prompt.replace(
+                "{jira_description}", jira_description_final
+            )
+        if has_instructions:
+            final_prompt = final_prompt.replace(
+                "{additional_instructions}", additional_instructions_final
+            )
+
+        # Then remove entire sections for empty placeholders
+        # The order matters here - we should always start with optional sections first
+        if not has_instructions:
+            final_prompt = remove_section(final_prompt, "additional_instructions")
+        if not has_jira:
+            final_prompt = remove_section(final_prompt, "jira_description")
+        if not has_context:
+            final_prompt = remove_section(final_prompt, "relevant_code_context")
+
     except KeyError as e:
         logger.error(
             f"Template formatting error: Placeholder {e} not found in template ID {template_id}. Available placeholders: relevant_code_context, jira_description, additional_instructions"
@@ -182,3 +242,16 @@ def generate_prompt(
 
     logger.info(f"Prompt generation complete using template ID {template_id}.")
     return final_prompt
+
+
+def test_section_removal(template: str, placeholder_name: str) -> str:
+    """Helper function to test section removal logic on a given template.
+
+    Args:
+        template: Template content to test against
+        placeholder_name: Name of the placeholder to remove
+
+    Returns:
+        The template with the section removed
+    """
+    return remove_section(template, placeholder_name)

@@ -35,6 +35,20 @@ function initFileExplorer() {
             return;
         }
         
+        // Handle clicks on checkbox container or custom checkbox representation
+        const checkboxContainer = event.target.closest('.checkbox-container');
+        if (checkboxContainer && !event.target.matches('input[type="checkbox"]')) {
+            // Find the actual checkbox input within this container
+            const checkbox = checkboxContainer.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                // Toggle the checkbox state
+                checkbox.checked = !checkbox.checked;
+                // Update the UI
+                updateSelectedFilesList();
+                return;
+            }
+        }
+        
         // Use event delegation for file preview toggle (on file-info div)
         const fileInfo = event.target.closest('.file-info');
         if (fileInfo && fileInfo.hasAttribute('onclick')) { // Check if preview is enabled
@@ -64,6 +78,20 @@ function initFileExplorer() {
             const filename = addButton.getAttribute('data-filename');
             if (path && filename) {
                 addFileToContext(path, filename);
+            }
+            return;
+        }
+        
+        // Handle clicks on file-label (whole file row) to toggle checkbox
+        const fileLabel = event.target.closest('.file-label');
+        if (fileLabel && !event.target.closest('.action-button') && !event.target.closest('.checkbox-container') && !event.target.closest('.file-info')) {
+            // Find the checkbox within this file label
+            const checkbox = fileLabel.querySelector('input[name="context_files"]');
+            if (checkbox) {
+                // Toggle the checkbox state
+                checkbox.checked = !checkbox.checked;
+                // Update the UI
+                updateSelectedFilesList();
             }
             return;
         }
@@ -105,6 +133,11 @@ function updateSelectedFilesList() {
     document.dispatchEvent(new CustomEvent('selectedFilesChanged', { 
         detail: { count: checked.length } 
     }));
+    
+    // Check if any preset needs to be unchecked due to file removal
+    if (typeof updatePresetCheckboxes === 'function') {
+        updatePresetCheckboxes();
+    }
 }
 
 function removeFile(filepath) {
@@ -112,6 +145,11 @@ function removeFile(filepath) {
     if (cb) {
         cb.checked = false;
         updateSelectedFilesList();
+        
+        // Check if any preset needs to be unchecked
+        if (typeof updatePresetCheckboxes === 'function') {
+            updatePresetCheckboxes();
+        }
     }
 }
 
@@ -132,7 +170,6 @@ function toggleFilePreview(filepath, filename) {
     const nonPreviewableExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt', 'pdf', 'zip', 'gz', 'tar', 'rar'];
     
     if (nonPreviewableExtensions.includes(fileExt)) {
-        showToast(`Cannot preview "${filename}": This file type cannot be previewed.`, 'error');
         return;
     }
     
@@ -365,15 +402,12 @@ async function refreshFileTree() {
             restoreSelectedFiles(selectedFiles);
             // No need to re-call initFileExplorer due to event delegation
         } else if (data.error) {
-            showToast(`Error refreshing file tree: ${data.error}`, 'error');
             fileTreeContainer.innerHTML = `<p class="error">Error loading file tree: ${data.error}</p>`;
         } else {
-             showToast('Received empty response during refresh.', 'warning');
              fileTreeContainer.innerHTML = `<p class="error">Empty response received.</p>`;
         }
     } catch (error) {
         console.error('Failed to refresh file tree:', error);
-        showToast(`Failed to refresh file tree: ${error.message}`, 'error');
         fileTreeContainer.innerHTML = `<p class="error">Failed to load file tree. ${error.message}</p>`;
     } finally {
         // Remove loading state
@@ -419,52 +453,6 @@ function restoreSelectedFiles(selectedFiles) {
     
     // Update the selected files list in the UI
     updateSelectedFilesList();
-}
-
-// Utility function for showing toast messages
-function showToast(message, type = 'info') {
-    console.log(`[${type.toUpperCase()}] ${message}`);
-    
-    // Check if toast container exists, if not create it
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        document.body.appendChild(toastContainer);
-    }
-    
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    // Create toast content with icon based on type
-    let icon = 'info-circle';
-    if (type === 'error') icon = 'exclamation-circle';
-    if (type === 'success') icon = 'check-circle';
-    if (type === 'warning') icon = 'exclamation-triangle';
-    
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${icon}"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    // Add to container
-    toastContainer.appendChild(toast);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        toast.classList.add('toast-fade-out');
-        setTimeout(() => {
-            if (toast.parentElement) {
-                toast.remove();
-            }
-        }, 300); // Match the animation duration
-    }, 5000);
 }
 
 /**
@@ -849,23 +837,19 @@ function highlightMatches(text, query) {
                 const escapedPart = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 
                 // Create a regex that's case insensitive
-                const regex = new RegExp(`(${escapedPart})`, 'gi');
+                const regex = new RegExp(`${escapedPart}`, 'gi');
                 
-                // Replace matches with highlighted spans
-                result = result.replace(regex, '<span class="search-highlight">$1</span>');
+                // Replace matched parts with highlighted HTML
+                result = result.replace(regex, '<span class="highlighted">$1</span>');
             });
             
             return result;
         }
     }
     
-    // For simple searches or if path handling didn't apply, use the standard approach
-    // Escape special regex characters in the query
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
     // Create a regex that's case insensitive
-    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    const regex = new RegExp(`${query}`, 'gi');
     
-    // Replace matches with highlighted spans
-    return text.replace(regex, '<span class="search-highlight">$1</span>');
+    // Replace matched parts with highlighted HTML
+    return text.replace(regex, '<span class="highlighted">$1</span>');
 }

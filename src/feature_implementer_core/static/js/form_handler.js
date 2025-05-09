@@ -103,18 +103,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function copyGeneratedPrompt() {
         const promptText = promptContent.textContent || '';
         if (!promptText.trim()) {
-            showToast('No content to copy', 'error');
             return;
         }
         
         // Use clipboard API to copy text
         navigator.clipboard.writeText(promptText)
-            .then(() => {
-                showToast('Prompt copied to clipboard!', 'success');
-            })
             .catch(err => {
                 console.error('Error copying text: ', err);
-                showToast('Failed to copy: ' + err, 'error');
             });
     }
     
@@ -124,7 +119,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function exportGeneratedPrompt() {
         const promptText = promptContent.textContent || '';
         if (!promptText.trim()) {
-            showToast('No content to export', 'error');
             return;
         }
         
@@ -148,8 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
-        
-        showToast('Prompt exported as Markdown file', 'success');
     }
 });
 

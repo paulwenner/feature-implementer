@@ -104,8 +104,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   margin-right: 6px;
   position: relative;
 }
@@ -116,17 +116,20 @@
   cursor: pointer;
   width: 100%;
   height: 100%;
-  z-index: 1;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
 }
 
 .custom-checkbox {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border: 1px solid #5a5a5a;
   border-radius: 3px;
   background-color: transparent;
   position: absolute;
   transition: all 0.2s;
+  pointer-events: none;
 }
 
 .checkbox-container input[type="checkbox"]:checked + .custom-checkbox {
@@ -185,4 +188,29 @@
 
 .action-button.not-previewable:hover {
   opacity: 0.4; /* Keep opacity low on hover */
+}
+
+.checkbox-container:hover .custom-checkbox {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: #7a7a7a;
+}
+
+.checkbox-container input[type="checkbox"]:focus + .custom-checkbox {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.25);
+}
+
+/* Preset file highlighting */
+.file-label.preset-file {
+  background-color: rgba(64, 128, 192, 0.15);
+  border-left: 3px solid var(--accent, #0e639c);
+  padding-left: 13px; /* 16px - 3px border */
+}
+
+.file-label.preset-file:hover {
+  background-color: rgba(64, 128, 192, 0.25);
+}
+
+.file-label.preset-file .custom-checkbox {
+  border-color: var(--accent, #0e639c);
 } 

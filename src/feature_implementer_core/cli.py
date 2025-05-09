@@ -376,7 +376,7 @@ def run_web_app():
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get("PORT", 5000)),
+        default=int(os.environ.get("PORT", 4605)),
         help="Port number (set PORT env var)",
     )
     parser.add_argument(

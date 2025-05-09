@@ -22,11 +22,12 @@
                 {% set filename_lower = key|lower %}
                 {% set file_ext = filename_lower.split('.')[-1] if '.' in filename_lower else '' %}
                 {% set is_previewable = file_ext not in non_previewable_extensions %}
+                {% set checkbox_id = 'file_' ~ value|replace('/', '_')|replace('.', '_') %}
                 {# --- End logic --- #}
                 <li class="file">
                     <div class="file-label">
-                        <label class="checkbox-container">
-                            <input type="checkbox" name="context_files" value="{{ value }}" data-filename="{{ key }}" id="file_{{ value|replace('/', '_')|replace('.', '_') }}" onchange="updateSelectedFilesList()">
+                        <label class="checkbox-container" for="{{ checkbox_id }}">
+                            <input type="checkbox" name="context_files" value="{{ value }}" data-filename="{{ key }}" id="{{ checkbox_id }}" onchange="updateSelectedFilesList()">
                             <span class="custom-checkbox"></span>
                         </label>
                         <div class="file-info" {% if is_previewable %}onclick="toggleFilePreview('{{ value }}', '{{ key }}')"{% endif %} >
@@ -38,7 +39,8 @@
                         <div class="file-actions">
                             <button type="button" 
                                     class="action-button {% if not is_previewable %}not-previewable{% endif %}" 
-                                    {% if is_previewable %}onclick="toggleFilePreview('{{ value }}', '{{ key }}')"{% else %}disabled title="Preview not available for this file type"{% endif %}>
+                                    {% if is_previewable %}onclick="toggleFilePreview('{{ value }}', '{{ key }}')"{% endif %}
+                                    {% if not is_previewable %}disabled title="Preview not available for this file type"{% endif %}>
                                 <i class="fas fa-eye"></i>
                             </button>
                             <button type="button" class="action-button" onclick="addFileToContext('{{ value }}', '{{ key }}')">

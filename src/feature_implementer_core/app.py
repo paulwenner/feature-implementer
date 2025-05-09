@@ -15,6 +15,7 @@ import os.path
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 import sqlite3
+import platform
 
 from .config import (
     Config,
@@ -84,7 +85,18 @@ def create_app():
 
             # Get presets from DB
             presets = database.get_presets(db_path)
-            presets_json = json.dumps(presets)
+            # Debug info for presets
+            logger.debug(f"Loaded {len(presets)} presets")
+            for name, files in presets.items():
+                logger.debug(f"Preset '{name}': {len(files)} files")
+
+            # Fix the presets structure for JavaScript
+            # JavaScript expects: { "presetName": { "files": ["file1", "file2"] } }
+            formatted_presets = {}
+            for name, files in presets.items():
+                formatted_presets[name] = {"files": files}
+
+            presets_json = json.dumps(formatted_presets)
 
             # Get available templates from DB
             templates = database.get_templates(db_path)
@@ -110,20 +122,27 @@ def create_app():
                     )
             else:
                 logger.warning("No default template ID found in database.")
-                # Maybe fall back to the file content?
-                # file_content_preview = load_default_template_content()
-                # template_preview = (file_content_preview[:500] + "...") if len(file_content_preview) > 500 else file_content_preview
+
+            # Get app version for debugging
+            app_version = getattr(Config, "VERSION", "Unknown")
+            host_info = platform.platform()
+
+            logger.debug(
+                f"Rendering index template with app version: {app_version}, host: {host_info}"
+            )
 
             return render_template(
                 "index.html",
                 file_tree=file_tree,
                 scan_dirs=Config.SCAN_DIRS,
                 template_preview=template_preview,
-                presets=presets,
+                presets=formatted_presets,
                 presets_json=presets_json,
                 templates=templates,
                 templates_json=templates_json,
                 default_template_id=default_template_id,
+                app_version=app_version,
+                host_info=host_info,
             )
         except Exception as e:
             logger.error(f"Error rendering index page: {e}", exc_info=True)
@@ -139,6 +158,8 @@ def create_app():
                 templates=[],
                 templates_json="[]",
                 default_template_id=None,
+                app_version="Unknown",
+                host_info="Unknown",
             )
 
     @app.route("/generate", methods=["POST"])
@@ -175,12 +196,6 @@ def create_app():
                 logger.warning("No files selected, returning error.")
                 return (
                     jsonify({"error": "Please select at least one context file."}),
-                    400,
-                )
-            if not jira_desc:
-                logger.warning("No Jira description provided, returning error.")
-                return (
-                    jsonify({"error": "Please provide a Jira description."}),
                     400,
                 )
 
@@ -317,7 +332,13 @@ def create_app():
         db_path = _db_path()
         try:
             presets_data = database.get_presets(db_path)
-            return jsonify({"presets": presets_data})
+
+            # Format presets for JavaScript
+            formatted_presets = {}
+            for preset_name, preset_files in presets_data.items():
+                formatted_presets[preset_name] = {"files": preset_files}
+
+            return jsonify({"presets": formatted_presets})
         except Exception as e:
             logger.error(f"Error retrieving presets: {e}", exc_info=True)
             return jsonify({"error": "Failed to retrieve presets"}), 500
@@ -356,7 +377,13 @@ def create_app():
             if success:
                 # Return the updated list of presets
                 presets_data = database.get_presets(db_path)
-                return jsonify({"success": True, "presets": presets_data})
+
+                # Format presets for JavaScript
+                formatted_presets = {}
+                for preset_name, preset_files in presets_data.items():
+                    formatted_presets[preset_name] = {"files": preset_files}
+
+                return jsonify({"success": True, "presets": formatted_presets})
             else:
                 # add_preset handles logging, check if it was due to existence?
                 # We might need more specific return values from database module
@@ -387,7 +414,13 @@ def create_app():
             if success:
                 # Return the updated list of presets
                 presets_data = database.get_presets(db_path)
-                return jsonify({"success": True, "presets": presets_data})
+
+                # Format presets for JavaScript
+                formatted_presets = {}
+                for preset_name, preset_files in presets_data.items():
+                    formatted_presets[preset_name] = {"files": preset_files}
+
+                return jsonify({"success": True, "presets": formatted_presets})
             else:
                 logger.warning(f"Preset '{preset_name}' not found or deletion failed.")
                 return jsonify({"error": f"Preset '{preset_name}' not found"}), 404
@@ -760,6 +793,33 @@ def create_app():
         except Exception as e:
             logger.error(f"Error resetting to standard templates: {e}", exc_info=True)
             return jsonify({"error": "Server error resetting templates"}), 500
+
+    @app.route("/debug/presets", methods=["GET"])
+    def debug_presets() -> Response:
+        """Debug route to examine preset data structure."""
+        logger.debug("Handling GET /debug/presets")
+        db_path = _db_path()
+        try:
+            # Get raw presets from DB
+            raw_presets = database.get_presets(db_path)
+
+            # Format presets for JavaScript
+            formatted_presets = {}
+            for preset_name, preset_files in raw_presets.items():
+                formatted_presets[preset_name] = {"files": preset_files}
+
+            # Prepare debug info
+            debug_info = {
+                "raw_presets": raw_presets,
+                "formatted_presets": formatted_presets,
+                "preset_count": len(raw_presets),
+                "formatted_json": json.dumps(formatted_presets),
+            }
+
+            return jsonify(debug_info)
+        except Exception as e:
+            logger.error(f"Error debugging presets: {e}", exc_info=True)
+            return jsonify({"error": f"Error: {str(e)}"}), 500
 
     return app
 

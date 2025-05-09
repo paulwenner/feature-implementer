@@ -3,9 +3,9 @@
 
 {% block additional_head %}
 <script>
-    var presets = JSON.parse('{{ presets_json | safe }}');
-    var templates = JSON.parse('{{ templates_json | safe }}');
-    var defaultTemplateId = {{ default_template_id | tojson | safe }};
+    var presets = {{ presets_json|tojson|safe }};
+    var templates = {{ templates_json|tojson|safe }};
+    var defaultTemplateId = {{ default_template_id|tojson|safe }};
 </script>
 {% endblock %}
 
@@ -131,13 +131,13 @@
             </div>
             
             <div class="form-section">
-                <h2 class="section-title">JIRA Ticket Description</h2>
-                <textarea name="jira_description" placeholder="Paste your JIRA ticket description here..."></textarea>
+                <h2 class="section-title">JIRA Ticket Description (Optional)</h2>
+                <textarea name="jira_description" placeholder="Paste your JIRA ticket description here (optional)..."></textarea>
             </div>
             
             <div class="form-section">
-                <h2 class="section-title">Additional Instructions</h2>
-                <textarea name="additional_instructions" placeholder="Any additional implementation instructions..."></textarea>
+                <h2 class="section-title">Additional Instructions (Optional)</h2>
+                <textarea name="additional_instructions" placeholder="Any additional implementation instructions (optional)..."></textarea>
             </div>
         </div>
         
