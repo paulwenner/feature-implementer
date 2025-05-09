@@ -117,6 +117,12 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help=f"Path to use as the working directory instead of the current one. Files, database and outputs will be relative to this location.",
     )
+    parser.add_argument(
+        "--prompts-dir",
+        type=str,
+        default=None,
+        help=f"Path to a directory containing additional prompt files (.md). Defaults to ./prompts/ within the working directory.",
+    )
     return parser.parse_args()
 
 
@@ -269,6 +275,22 @@ def main_cli() -> None:
             logger.error(f"Working directory error: {e}")
             sys.exit(1)
 
+    # Set up the prompts directory if specified
+    if args.prompts_dir:
+        logger.info(f"Using custom prompts directory: {args.prompts_dir}")
+        try:
+            Config.set_prompts_dir(args.prompts_dir)
+        except ValueError as e:
+            logger.error(f"Prompts directory error: {e}")
+            sys.exit(1)
+
+    # Ensure prompts directory exists
+    try:
+        Config.PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Prompts directory: {Config.PROMPTS_DIR}")
+    except Exception as e:
+        logger.warning(f"Could not create prompts directory: {e}")
+
     # Get the configured DB path (after working_dir is applied)
     db_path = get_app_db_path()
 
@@ -420,8 +442,16 @@ def run_web_app():
         default=None,
         help="Path to use as the working directory instead of the current one. Files, database, and outputs will be relative to this location.",
     )
+    parser.add_argument(
+        "--prompts-dir",
+        type=str,
+        default=None,
+        help="Path to a directory containing additional prompt files (.md). Defaults to ./prompts/ within the working directory.",
+    )
 
-    args = parser.parse_args()
+    # Parse known arguments, allowing unknown arguments to pass through
+    # This helps with Docker and other deployment scenarios
+    args, unknown = parser.parse_known_args()
 
     # Set up the working directory if specified
     if args.working_dir:
@@ -431,6 +461,22 @@ def run_web_app():
         except ValueError as e:
             logger.error(f"Working directory error: {e}")
             sys.exit(1)
+
+    # Set up the prompts directory if specified
+    if args.prompts_dir:
+        logger.info(f"Using custom prompts directory: {args.prompts_dir}")
+        try:
+            Config.set_prompts_dir(args.prompts_dir)
+        except ValueError as e:
+            logger.error(f"Prompts directory error: {e}")
+            sys.exit(1)
+
+    # Ensure prompts directory exists
+    try:
+        Config.PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Prompts directory: {Config.PROMPTS_DIR}")
+    except Exception as e:
+        logger.warning(f"Could not create prompts directory: {e}")
 
     # Create the Flask app instance
     # Database initialization happens inside create_app()

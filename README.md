@@ -12,6 +12,7 @@ A pip-installable tool to generate feature implementation prompts for software d
 - CLI for prompt generation and template management
 - Web UI (Flask) for interactive use
 - Light/dark mode support in Web UI
+- Support for specifying custom working and prompts directories
 
 ## Project Structure (Package)
 
@@ -93,6 +94,12 @@ feature-implementer/              # Project Root
         
         # Use a different working directory than the current one
         feature-implementer --working-dir /path/to/project
+        
+        # Specify a custom directory for additional prompt files
+        feature-implementer --prompts-dir /path/to/prompts
+        
+        # Combine multiple parameters
+        feature-implementer --host 0.0.0.0 --port 4605 --working-dir /app/project --prompts-dir /app/prompts
         ```
     *   **CLI:** Use the `feature-implementer-cli` command for direct operations (see CLI Usage below).
 
@@ -148,6 +155,9 @@ feature-implementer-cli --context-files ... --jira path/to/description.txt
 
 # Use a different working directory for file operations
 feature-implementer-cli --working-dir /path/to/project --context-files app.py models.py --jira "FEAT-456: Add new feature"
+
+# Specify a custom directory for additional prompt files
+feature-implementer-cli --prompts-dir /path/to/prompts --context-files app.py --jira "FEAT-789: New feature"
 
 # 2. Manage Templates
 

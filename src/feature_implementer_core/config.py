@@ -42,6 +42,8 @@ class Config:
     DEFAULT_TEMPLATE_FILE = MODULE_DIR / "feature_implementation_template.md"
     DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / "outputs"
     DEFAULT_OUTPUT_FILE = DEFAULT_OUTPUT_DIR / "implementation_prompt.md"
+    # Directory for storing additional prompt templates as markdown files
+    PROMPTS_DIR = WORKSPACE_ROOT / "prompts"
     # TEMPLATES_DIR = MODULE_DIR / "templates" / "user_templates" # Not used if templates are DB only
 
     # --- Database Configuration ---
@@ -148,6 +150,7 @@ Implement the feature."""
                 cls.DEFAULT_OUTPUT_DIR / "implementation_prompt.md"
             )
             cls.DB_PATH = cls.WORKSPACE_ROOT / "feature_implementer.db"
+            cls.PROMPTS_DIR = cls.WORKSPACE_ROOT / "prompts"
 
             # Update scan directories
             cls.SCAN_DIRS = [str(cls.WORKSPACE_ROOT)]
@@ -170,6 +173,30 @@ Implement the feature."""
         except Exception as e:
             logger.error(
                 f"Error setting workspace root to {workspace_path}: {e}", exc_info=True
+            )
+            raise
+
+    @classmethod
+    def set_prompts_dir(cls, prompts_dir: str):
+        """Set a custom directory for prompt templates"""
+        if not prompts_dir:
+            logger.warning("Empty prompts directory provided, using default")
+            return
+
+        try:
+            # Convert to absolute path and resolve
+            prompts_path = Path(prompts_dir).resolve()
+
+            # Create the directory if it doesn't exist
+            prompts_path.mkdir(parents=True, exist_ok=True)
+
+            # Update the prompts directory
+            cls.PROMPTS_DIR = prompts_path
+            logger.info(f"Prompts directory set to: {cls.PROMPTS_DIR}")
+
+        except Exception as e:
+            logger.error(
+                f"Error setting prompts directory to {prompts_dir}: {e}", exc_info=True
             )
             raise
 
