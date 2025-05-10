@@ -34,59 +34,154 @@ def load_prompt_templates_from_dir():
     prompts_dir = Config.PROMPTS_DIR
     db_path = get_app_db_path()
 
+    # Ensure prompts directory exists
+    try:
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Ensured prompts directory exists at: {prompts_dir}")
+    except Exception as e:
+        logger.error(f"Failed to create prompts directory {prompts_dir}: {e}")
+        return
+
     if not prompts_dir.exists():
-        logger.info(f"Prompts directory does not exist: {prompts_dir}")
+        logger.error(
+            f"Prompts directory does not exist despite creation attempt: {prompts_dir}"
+        )
         return
 
     logger.info(f"Loading prompt templates from directory: {prompts_dir}")
+
+    # List files to help with debugging
+    try:
+        files = list(prompts_dir.glob("*.md"))
+        logger.info(f"Found {len(files)} markdown files in {prompts_dir}")
+        for file in files:
+            logger.info(f"  - {file.name}")
+    except Exception as e:
+        logger.error(f"Error listing files in prompts dir {prompts_dir}: {e}")
+        files = []
 
     try:
         # Get existing template names to avoid duplicates
         existing_templates = database.get_templates(db_path)
         existing_names = {template["name"] for template in existing_templates}
 
+        # Also check file-based templates that were previously loaded
+        file_templates = {
+            t["name"] for t in existing_templates if "(File)" in t["name"]
+        }
+
+        # Track loaded templates for summary
+        loaded_templates = []
+        skipped_templates = []
+
         count = 0
         for file_path in prompts_dir.glob("*.md"):
             template_name = file_path.stem
+            file_template_name = f"{template_name} (File)"
 
-            # Skip if a template with this name already exists
-            if template_name in existing_names:
+            # Skip if a template with this name already exists but not if it's a previously loaded file template
+            # This allows refreshing file-based templates
+            if (
+                template_name in existing_names
+                and file_template_name not in file_templates
+            ):
                 logger.debug(f"Template '{template_name}' already exists, skipping")
+                skipped_templates.append(template_name)
                 continue
 
             try:
+                # Check file readability and permissions
+                if not os.access(str(file_path), os.R_OK):
+                    logger.warning(f"No read permission for template file: {file_path}")
+                    skipped_templates.append(f"{template_name} (permission denied)")
+                    continue
+
                 content = file_path.read_text()
 
                 # Skip empty files
                 if not content.strip():
                     logger.warning(f"Empty template file: {file_path}, skipping")
+                    skipped_templates.append(f"{template_name} (empty)")
                     continue
 
-                # Add to database
-                success, result = database.add_template(
-                    db_path,
-                    name=f"{template_name} (File)",
-                    content=content,
-                    description=f"Loaded from file: {file_path.name}",
-                    is_default=False,
-                )
-
-                if success:
-                    count += 1
-                    existing_names.add(template_name)
-                    logger.info(
-                        f"Added template '{template_name}' from file {file_path.name}"
+                # Either add new template or update existing file-based template
+                if file_template_name in file_templates:
+                    # Update existing file template
+                    template_id = next(
+                        t["id"]
+                        for t in existing_templates
+                        if t["name"] == file_template_name
                     )
+                    success, result = database.update_template(
+                        db_path,
+                        template_id=template_id,
+                        name=file_template_name,
+                        content=content,
+                        description=f"Loaded from file: {file_path.name} (updated)",
+                        is_default=False,  # Don't change default status on update
+                    )
+                    if success:
+                        loaded_templates.append(f"{template_name} (updated)")
+                        logger.info(
+                            f"Updated template '{template_name}' from file {file_path.name}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Failed to update template from {file_path}: {result}"
+                        )
+                        skipped_templates.append(f"{template_name} (update failed)")
                 else:
-                    logger.warning(f"Failed to add template from {file_path}: {result}")
+                    # Add new template
+                    success, result = database.add_template(
+                        db_path,
+                        name=file_template_name,
+                        content=content,
+                        description=f"Loaded from file: {file_path.name}",
+                        is_default=False,
+                    )
+                    if success:
+                        count += 1
+                        loaded_templates.append(template_name)
+                        existing_names.add(template_name)
+                        logger.info(
+                            f"Added template '{template_name}' from file {file_path.name}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Failed to add template from {file_path}: {result}"
+                        )
+                        skipped_templates.append(f"{template_name} (add failed)")
 
             except Exception as e:
-                logger.error(f"Error reading template file {file_path}: {e}")
+                logger.error(
+                    f"Error processing template file {file_path}: {e}", exc_info=True
+                )
+                skipped_templates.append(f"{template_name} (error: {str(e)[:30]}...)")
 
-        logger.info(f"Added {count} templates from prompt files directory")
+        # Summary logging
+        if loaded_templates:
+            logger.info(
+                f"Successfully loaded {len(loaded_templates)} templates: {', '.join(loaded_templates[:5])}"
+                + (
+                    f" and {len(loaded_templates)-5} more"
+                    if len(loaded_templates) > 5
+                    else ""
+                )
+            )
+        if skipped_templates:
+            logger.info(
+                f"Skipped {len(skipped_templates)} templates: {', '.join(skipped_templates[:5])}"
+                + (
+                    f" and {len(skipped_templates)-5} more"
+                    if len(skipped_templates) > 5
+                    else ""
+                )
+            )
 
     except Exception as e:
-        logger.error(f"Error loading templates from directory: {e}", exc_info=True)
+        logger.error(
+            f"Error during template loading from directory: {e}", exc_info=True
+        )
 
 
 def create_app():

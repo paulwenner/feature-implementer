@@ -19,8 +19,35 @@ from .file_utils import save_prompt_to_file
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Generate feature implementation prompts or manage templates (CLI tool)."
+        prog="feature-implementer",
+        description="Generate feature implementation prompts from templates",
     )
+
+    # Server mode arguments
+    parser.add_argument(
+        "--server",
+        action="store_true",
+        help="Run in web server mode instead of CLI mode",
+    )
+    parser.add_argument(
+        "--host", type=str, default="127.0.0.1", help="Host for server mode [127.0.0.1]"
+    )
+    parser.add_argument(
+        "--port", type=int, default=4605, help="Port for server mode [4605]"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode for the web server (not recommended for production)",
+    )
+
+    # New option for forcing prompt reload
+    parser.add_argument(
+        "--reload-prompts",
+        action="store_true",
+        help="Force reload of prompt templates from the prompts directory",
+    )
+
     # Template group (mutually exclusive options for template selection)
     template_group = parser.add_mutually_exclusive_group()
     # Allow template by path - DEPRECATED if using DB only?
@@ -298,10 +325,30 @@ def main_cli() -> None:
     try:
         initialize_app_database()  # This initializes the DB at the configured path
     except Exception as e:
-        logger.error(f"Failed to initialize database: {e}", exc_info=True)
+        logger.error(f"Failed to initialize database at {db_path}: {e}")
         sys.exit(1)
 
-    # --- Process Template Operations First (if any) ---
+    # Handle the reload-prompts option if specified
+    if args.reload_prompts:
+        logger.info("Force reloading prompts from prompts directory...")
+        from .app import load_prompt_templates_from_dir
+
+        load_prompt_templates_from_dir()
+        logger.info(f"Completed prompt reload from {Config.PROMPTS_DIR}")
+        # If this was the only operation requested, exit successfully
+        if (
+            not args.list_templates
+            and not args.set_default
+            and not args.delete_template
+            and not args.create_template
+            and not args.reset_templates
+            and not args.generate
+            and not args.server
+        ):
+            logger.info("Prompt reload completed successfully.")
+            sys.exit(0)
+
+    # Handle any template operations first
     template_op = handle_template_operations(args, db_path, logger)
     if template_op:
         # Template operation performed, exit early
