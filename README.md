@@ -13,7 +13,7 @@ pip install feature-implementer
 To use the latest development version instead, clone the repository and install it in editable mode:
 
 ```bash
-git clone https://github.com/yourname/feature-implementer.git
+git clone https://github.com/paulwenner/feature-implementer.git
 cd feature-implementer
 pip install -e .
 ```
