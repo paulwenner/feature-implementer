@@ -2,6 +2,22 @@
 
 A pip-installable tool to generate feature implementation prompts for software development projects. This application helps create well-structured prompts for LLMs by gathering context from relevant code files within your project.
 
+## Installation
+
+To install the latest release from [PyPI](https://pypi.org/project/feature-implementer/), run:
+
+```bash
+pip install feature-implementer
+```
+
+To use the latest development version instead, clone the repository and install it in editable mode:
+
+```bash
+git clone https://github.com/yourname/feature-implementer.git
+cd feature-implementer
+pip install -e .
+```
+
 ## Features
 
 - Browse and select files from your project directory for context
