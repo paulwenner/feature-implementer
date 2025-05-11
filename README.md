@@ -42,7 +42,8 @@ feature-implementer/              # Project Root
         │   ├── css/
         │   ├── js/
         │   └── ...
-        └── feature_implementer.db # Default database location (relative to where app runs)
+        └── prompts/                    # Directory for storing custom prompt templates (Markdown files)
+            └── example_custom_prompt.md
 ```
 
 ## Setup
@@ -119,7 +120,12 @@ feature-implementer/              # Project Root
 
 ## Template Management (Web UI & CLI)
 
-The application allows you to create and manage custom prompt templates stored in a local SQLite database (`feature_implementer.db`).
+The application allows you to create and manage custom prompt templates stored in a local SQLite database (`.feature_implementer.db`). This database is located in a standard user-specific application data directory, not within your project folder. The typical locations are:
+- Linux: `~/.local/share/feature_implementer/`
+- macOS: `~/Library/Application Support/feature_implementer/`
+- Windows: `%APPDATA%\feature_implementer\` (e.g., `C:\Users\YourUser\AppData\Roaming\feature_implementer\`)
+
+If the application cannot create or access this directory, it will fall back to creating a `.feature_implementer_data` directory in your current workspace.
 
 **Web UI:**
 1.  Navigate to the "Template Manager" page (link usually in the header/footer).

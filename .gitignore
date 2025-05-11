@@ -36,11 +36,6 @@ ENV/
 # Flask instance folder
 instance/
 
-# Database files
-*.sqlite3
-*.db
-feature_implementer.db
-
 # Migrations (if using Alembic)
 # Comment out if you do want to track migration scripts
 # migrations/

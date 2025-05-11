@@ -46,16 +46,29 @@ class Config:
     PROMPTS_DIR = WORKSPACE_ROOT / "prompts"
     # TEMPLATES_DIR = MODULE_DIR / "templates" / "user_templates" # Not used if templates are DB only
 
-    # --- Database Configuration ---
-    # Store the database in a standard user data location or relative to workspace?
-    # Option 1: Relative to workspace (simple, portable with project)
-    DB_PATH = WORKSPACE_ROOT / "feature_implementer.db"
-    # Option 2: User data directory (more standard for installed apps)
-    # APP_DATA_DIR = Path(os.environ.get("APPDATA") or
-    #                    os.environ.get("XDG_DATA_HOME") or
-    #                    Path.home() / ".local/share") / "feature_implementer"
-    # DB_PATH = APP_DATA_DIR / "feature_implementer.db"
-    # APP_DATA_DIR.mkdir(parents=True, exist_ok=True) # Ensure dir exists if using this option
+    # --- Application Data and Database Configuration ---
+    # Use a standard user data directory for the database.
+    _app_name = "feature_implementer"
+    if os.name == "nt":  # Windows
+        _app_data_base = os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
+    elif "XDG_DATA_HOME" in os.environ:  # Linux/other XDG compliant
+        _app_data_base = os.environ["XDG_DATA_HOME"]
+    elif os.uname().sysname == "Darwin":  # macOS
+        _app_data_base = Path.home() / "Library" / "Application Support"
+    else:  # Fallback for other Unix-like systems
+        _app_data_base = Path.home() / ".local" / "share"
+
+    APP_DATA_DIR = Path(_app_data_base) / _app_name
+    try:
+        APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Could not create application data directory {APP_DATA_DIR}: {e}")
+        # Fallback to workspace root if app data dir creation fails
+        APP_DATA_DIR = WORKSPACE_ROOT / f".{_app_name}_data"
+        APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        logger.warning(f"Using fallback data directory: {APP_DATA_DIR}")
+
+    DB_PATH = APP_DATA_DIR / ".feature_implementer.db"
 
     # --- File Explorer Configuration ---
     # Default scan directory is the workspace root
@@ -75,7 +88,7 @@ class Config:
         str(DEFAULT_OUTPUT_DIR.relative_to(WORKSPACE_ROOT))
         + os.sep
         + "*",  # Ignore output dir
-        DB_PATH.name,  # Ignore the database file itself
+        # DB_PATH.name, # No longer need to ignore DB_PATH by name in workspace, as it's outside
     ]
 
     # --- Default Template Content (loaded once) ---
@@ -149,7 +162,8 @@ Implement the feature."""
             cls.DEFAULT_OUTPUT_FILE = (
                 cls.DEFAULT_OUTPUT_DIR / "implementation_prompt.md"
             )
-            cls.DB_PATH = cls.WORKSPACE_ROOT / "feature_implementer.db"
+            # DB_PATH is global, should not be changed when workspace root changes
+            # cls.DB_PATH = cls.WORKSPACE_ROOT / ".feature_implementer.db" # This line removed
             cls.PROMPTS_DIR = cls.WORKSPACE_ROOT / "prompts"
 
             # Update scan directories
@@ -222,8 +236,14 @@ def get_app_db_path() -> Path:
     """Returns the configured database path."""
     # Ensures DB path creation logic is centralized if needed later
     # For now, just returns the config value.
-    # If using APP_DATA_DIR option above, ensure it exists here:
-    # Config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Ensure the parent directory for the database exists
+    try:
+        Config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(
+            f"Could not create database directory {Config.DB_PATH.parent}: {e}"
+        )
+        # Potentially raise or handle if critical
     return Config.DB_PATH
 
 
