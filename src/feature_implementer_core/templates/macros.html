@@ -27,7 +27,7 @@
                 <li class="file">
                     <div class="file-label">
                         <label class="checkbox-container" for="{{ checkbox_id }}">
-                            <input type="checkbox" name="context_files" value="{{ value }}" data-filename="{{ key }}" id="{{ checkbox_id }}" onchange="updateSelectedFilesList()">
+                            <input type="checkbox" name="context_files" value="{{ value }}" data-filename="{{ key }}" id="{{ checkbox_id }}" onchange="handleFileSelectionChange(this)">
                             <span class="custom-checkbox"></span>
                         </label>
                         <div class="file-info" {% if is_previewable %}onclick="toggleFilePreview('{{ value }}', '{{ key }}')"{% endif %} >

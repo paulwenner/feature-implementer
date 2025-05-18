@@ -105,6 +105,20 @@ function initFileExplorer() {
     });
 }
 
+function handleFileSelectionChange(changedCheckbox) {
+    const filePath = changedCheckbox.value;
+    const isChecked = changedCheckbox.checked;
+
+    const allCheckboxesForFile = document.querySelectorAll(`input[name="context_files"][value="${CSS.escape(filePath)}"]`);
+    allCheckboxesForFile.forEach(cb => {
+        if (cb.checked !== isChecked) { 
+            cb.checked = isChecked;
+        }
+    });
+
+    updateSelectedFilesList();
+}
+
 function updateSelectedFilesList() {
     const list = document.getElementById('selected-files-list');
     const checked = document.querySelectorAll('input[name="context_files"]:checked');
@@ -114,24 +128,34 @@ function updateSelectedFilesList() {
         document.dispatchEvent(new CustomEvent('selectedFilesChanged', { detail: { count: 0 } }));
         return;
     }
+    
+    // Track unique files to prevent duplicates
+    const uniqueFiles = new Set();
     let html = '<ul class="selected-files">';
+    
     checked.forEach(cb => {
         const label = cb.closest('.file-label');
         const name = label.querySelector('.filename').textContent;
-        html += `<li>
-            <span class="selected-file-name">${name}</span>
-            <span class="selected-file-path">${cb.value}</span>
-            <button type="button" class="action-button" onclick="removeFile('${cb.value}')">
-                <i class="fas fa-times"></i>
-            </button>
-        </li>`;
+        const filepath = cb.value;
+        
+        // Only add if not already in the set
+        if (!uniqueFiles.has(filepath)) {
+            uniqueFiles.add(filepath);
+            html += `<li>
+                <span class="selected-file-name">${name}</span>
+                <span class="selected-file-path">${filepath}</span>
+                <button type="button" class="action-button" onclick="removeFile('${filepath}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </li>`;
+        }
     });
     html += '</ul>';
     list.innerHTML = html;
     
     // Dispatch custom event with selection count
     document.dispatchEvent(new CustomEvent('selectedFilesChanged', { 
-        detail: { count: checked.length } 
+        detail: { count: uniqueFiles.size } 
     }));
     
     // Check if any preset needs to be unchecked due to file removal
@@ -141,24 +165,36 @@ function updateSelectedFilesList() {
 }
 
 function removeFile(filepath) {
-    const cb = document.querySelector(`input[value="${filepath}"]`);
-    if (cb) {
-        cb.checked = false;
-        updateSelectedFilesList();
-        
-        // Check if any preset needs to be unchecked
-        if (typeof updatePresetCheckboxes === 'function') {
-            updatePresetCheckboxes();
+    const checkboxes = document.querySelectorAll(`input[name="context_files"][value="${CSS.escape(filepath)}"]`);
+    let firstCheckbox = checkboxes.length > 0 ? checkboxes[0] : null;
+
+    if (firstCheckbox) {
+        if (firstCheckbox.checked) {
+            firstCheckbox.checked = false;
+            handleFileSelectionChange(firstCheckbox);
+        } else {
+
+             updateSelectedFilesList();
         }
+    } else {
+         updateSelectedFilesList();
+    }
+
+    if (typeof updatePresetCheckboxes === 'function') {
+        updatePresetCheckboxes();
     }
 }
 
 function clearSelectedFiles() {
-    document.querySelectorAll('input[name="context_files"]:checked').forEach(function(checkbox) {
-        checkbox.checked = false;
-    });
-    
-    updateSelectedFilesList();
+    const checkedCheckboxes = document.querySelectorAll('input[name="context_files"]:checked');
+    if (checkedCheckboxes.length > 0) {
+        checkedCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        updateSelectedFilesList();
+    } else {
+        updateSelectedFilesList();
+    }
 }
 
 function toggleFilePreview(filepath, filename) {
@@ -210,11 +246,15 @@ function closeFilePreview() {
 
 // Function to handle adding a file via the plus button
 function addFileToContext(filepath, filename) {
-    const checkboxId = `file_${filepath.replace(/\//g, '_').replace(/\./g, '_')}`;
-    const checkbox = document.getElementById(checkboxId);
-    if (checkbox) {
-        checkbox.checked = true;
-        updateSelectedFilesList();
+    const anyCheckboxForFile = document.querySelector(`input[name="context_files"][value="${CSS.escape(filepath)}"]`);
+
+    if (anyCheckboxForFile) {
+        if (!anyCheckboxForFile.checked) {
+            anyCheckboxForFile.checked = true; // Check it
+            handleFileSelectionChange(anyCheckboxForFile); // Sync others and update list
+        }
+    } else {
+        console.warn('No checkbox element found for file to add:', { filepath, filename });
     }
 }
 
@@ -728,87 +768,114 @@ function collectFileInfo(fileTree) {
 function renderSearchResults(container, results, query) {
     container.innerHTML = '';
     
+    // Group results by directory
+    const resultsByDir = {};
     results.forEach(file => {
-        // Create a result item element
-        const resultItem = document.createElement('div');
-        resultItem.className = 'search-result-item';
+        // Extract directory from path
+        const pathParts = file.path.split('/');
+        const dirPath = pathParts.slice(0, -1).join('/');
+        const dirName = pathParts.length > 1 ? pathParts[pathParts.length - 2] : '/';
         
-        // Get file type for icon
-        const fileExt = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
-        let fileIcon = 'fa-file';
+        if (!resultsByDir[dirPath]) {
+            resultsByDir[dirPath] = {
+                dirName: dirName,
+                files: []
+            };
+        }
+        resultsByDir[dirPath].files.push(file);
+    });
+    
+    // Render results, organized by directory
+    for (const dirPath in resultsByDir) {
+        const dirGroup = document.createElement('div');
+        dirGroup.className = 'search-result-directory';
         
-        // Customize icon based on file type
-        if (['js', 'ts', 'jsx', 'tsx'].includes(fileExt)) {
-            fileIcon = 'fa-file-code';
-        } else if (['html', 'htm', 'xml'].includes(fileExt)) {
-            fileIcon = 'fa-file-code';
-        } else if (['css', 'scss', 'sass', 'less'].includes(fileExt)) {
-            fileIcon = 'fa-file-code';
-        } else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(fileExt)) {
-            fileIcon = 'fa-file-image';
-        } else if (['md', 'txt', 'log'].includes(fileExt)) {
-            fileIcon = 'fa-file-alt';
-        } else if (['pdf'].includes(fileExt)) {
-            fileIcon = 'fa-file-pdf';
-        } else if (['zip', 'rar', 'tar', 'gz'].includes(fileExt)) {
-            fileIcon = 'fa-file-archive';
+        // Add directory header if there are multiple directories
+        if (Object.keys(resultsByDir).length > 1) {
+            const dirHeader = document.createElement('div');
+            dirHeader.className = 'search-result-directory-header';
+            dirHeader.innerHTML = `<i class="fas fa-folder"></i> ${resultsByDir[dirPath].dirName}`;
+            dirGroup.appendChild(dirHeader);
         }
         
-        // Highlight matched parts in filename and path
-        const highlightedName = highlightMatches(file.name, query);
-        const highlightedPath = highlightMatches(file.path, query);
+        // Create a file list for this directory
+        const fileList = document.createElement('ul');
+        fileList.className = 'file-list';
         
-        // Build result item HTML
-        resultItem.innerHTML = `
-            <div class="search-result-item-info">
-                <div class="search-result-item-name">
-                    <i class="fas ${fileIcon}"></i> ${highlightedName}
+        // Add files in this directory
+        resultsByDir[dirPath].files.forEach(file => {
+            // Get file type for icon
+            const fileExt = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+            let fileIcon = 'fa-file';
+            
+            // Customize icon based on file type
+            if (['js', 'ts', 'jsx', 'tsx'].includes(fileExt)) {
+                fileIcon = 'fa-file-code';
+            } else if (['html', 'htm', 'xml'].includes(fileExt)) {
+                fileIcon = 'fa-file-code';
+            } else if (['css', 'scss', 'sass', 'less'].includes(fileExt)) {
+                fileIcon = 'fa-file-code';
+            } else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(fileExt)) {
+                fileIcon = 'fa-file-image';
+            } else if (['md', 'txt', 'log'].includes(fileExt)) {
+                fileIcon = 'fa-file-alt';
+            } else if (['pdf'].includes(fileExt)) {
+                fileIcon = 'fa-file-pdf';
+            } else if (['zip', 'rar', 'tar', 'gz'].includes(fileExt)) {
+                fileIcon = 'fa-file-archive';
+            }
+            
+            // Highlight matched parts in filename and path
+            const highlightedName = highlightMatches(file.name, query);
+            const highlightedPath = highlightMatches(file.path, query);
+            
+            // Create list item
+            const listItem = document.createElement('li');
+            listItem.className = 'file';
+            
+            // Generate checkbox ID exactly like in the template
+            const checkboxId = `file_${file.path.replace(/\//g, '_').replace(/\./g, '_')}`;
+            
+            // Check if the file is already selected in the tree
+            const isChecked = document.querySelector(`input[value="${file.path}"]:checked`) !== null;
+            
+            // Build file item HTML that matches the file explorer layout
+            listItem.innerHTML = `
+                <div class="file-label">
+                    <label class="checkbox-container" for="${checkboxId}">
+                        <input type="checkbox" name="context_files" value="${file.path}" 
+                            data-filename="${file.name}" id="${checkboxId}" 
+                            onchange="handleFileSelectionChange(this)" ${isChecked ? 'checked' : ''}>
+                        <span class="custom-checkbox"></span>
+                    </label>
+                    <div class="file-info" onclick="toggleFilePreview('${file.path}', '${file.name}')">
+                        <span class="icon file-icon">
+                            <i class="fas ${fileIcon}"></i>
+                        </span>
+                        <span class="filename">${highlightedName}</span>
+                    </div>
+                    <div class="file-actions">
+                        <button type="button" class="action-button" onclick="toggleFilePreview('${file.path}', '${file.name}')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button type="button" class="action-button" onclick="addFileToContext('${file.path}', '${file.name}')">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="search-result-item-path">${highlightedPath}</div>
-            </div>
-            <div class="search-result-item-actions">
-                <button type="button" class="action-button" data-action="preview" title="Preview" data-path="${file.path}" data-filename="${file.name}">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button type="button" class="action-button" data-action="add" title="Add to selected files" data-path="${file.path}" data-filename="${file.name}">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        `;
-        
-        // Add click event to open preview when clicking on the file info
-        const fileInfo = resultItem.querySelector('.search-result-item-info');
-        fileInfo.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent any default actions
-            toggleFilePreview(file.path, file.name);
-        });
-        
-        // Add click event for the preview button
-        const previewButton = resultItem.querySelector('.action-button[data-action="preview"]');
-        previewButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent form submission
-            e.stopPropagation(); // Stop event from bubbling
-            toggleFilePreview(file.path, file.name);
-        });
-        
-        // Add click event for the add button
-        const addButton = resultItem.querySelector('.action-button[data-action="add"]');
-        addButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent form submission
-            e.stopPropagation(); // Stop event from bubbling
+            `;
             
-            // Check the corresponding checkbox in the file tree
-            const checkbox = document.getElementById(file.checkboxId);
-            if (checkbox) {
-                checkbox.checked = true;
-                updateSelectedFilesList();
-            } else {
-                addFileToContext(file.path, file.name);
-            }
+            // Add the file to the list
+            fileList.appendChild(listItem);
         });
         
-        container.appendChild(resultItem);
-    });
+        // Add the file list to the directory group
+        dirGroup.appendChild(fileList);
+        
+        // Add the directory group to the container
+        container.appendChild(dirGroup);
+    }
 }
 
 /**
@@ -837,7 +904,7 @@ function highlightMatches(text, query) {
                 const escapedPart = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 
                 // Create a regex that's case insensitive
-                const regex = new RegExp(`${escapedPart}`, 'gi');
+                const regex = new RegExp(`(${escapedPart})`, 'gi');
                 
                 // Replace matched parts with highlighted HTML
                 result = result.replace(regex, '<span class="highlighted">$1</span>');
@@ -847,8 +914,10 @@ function highlightMatches(text, query) {
         }
     }
     
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
     // Create a regex that's case insensitive
-    const regex = new RegExp(`${query}`, 'gi');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
     
     // Replace matched parts with highlighted HTML
     return text.replace(regex, '<span class="highlighted">$1</span>');

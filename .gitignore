@@ -71,3 +71,5 @@ coverage.xml
 
 #DS store
 .DS_Store
+
+pyproject.toml
